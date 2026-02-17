@@ -30,11 +30,6 @@ contract LoanRegistry is AccessControl {
 
     bytes32[] public registeredLoans;
 
-    modifier loanExists(bytes32 loanId) {
-        _loanExists(loanId);
-        _;
-    }
-
     event LoanRegistered(
         bytes32 indexed loanId,
         address indexed tokenAddress,
@@ -66,6 +61,11 @@ contract LoanRegistry is AccessControl {
     error ConvenantNotFound(bytes32 loanId, string covenantName);
     error InvalidCovenantArray();
     error InvalidTokenAddress();
+
+    modifier loanExists(bytes32 loanId) {
+        _loanExists(loanId);
+        _;
+    }
 
 
     constructor(address authorizedWorkflow) {
