@@ -241,6 +241,151 @@ contract LoanHealthFeed is AccessControl {
         emit LoanMonitoringDeactivated(loanId, block.timestamp);
     }
 
+    function getLatestReport(bytes32 loanId)
+        public
+        view
+        loanIsMonitored(loanId)
+        returns (
+            CovenantStatus overallStatus,
+            TrendIndicator overallTrend,
+            uint256 overallConfidenceScore,
+            uint256 reportTimestamp,
+            uint256 reportIndex,
+            string memory riskNarrative,
+            bool isActive
+        )
+    {
+        LoanHealthReport storage report = latestReports[loanId];
+        return (
+            report.overallStatus,
+            report.overallTrend,
+            report.overallConfidenceScore,
+            report.reportTimestamp,
+            report.reportIndex,
+            report.riskNarrative,
+            report.isActive
+        );
+    }
+
+    function getLatestCovenantReports(bytes32 loanId)
+        public
+        view
+        loanIsMonitored(loanId)
+        returns (CovenantReport[] memory)
+    {
+        return latestReports[loanId].covenantReports;
+    }
+
+    function getCovenantStatus(bytes32 loanId, string calldata covenantName)
+        public
+        view
+        loanIsMonitored(loanId)
+        returns (
+            CovenantStatus status,
+            uint256 calculatedValue,
+            uint256 threshold,
+            uint256 confidenceScore,
+            TrendIndicator trend
+        )
+    {
+        CovenantReport[] storage reports = latestReports[loanId].covenantReports;
+        for (uint256 i = 0; i < reports.length; i++) {
+            if (keccak256(bytes(reports[i].covenantName)) == keccak256(bytes(covenantName))) {
+                return (
+                    reports[i].status,
+                    reports[i].calculatedValue,
+                    reports[i].threshold,
+                    reports[i].confidenceScore,
+                    reports[i].trend
+                );
+            }
+        }
+        revert("LoanHealthFeed: Covenant not found in latest report");
+    }
+
+    function getHistoricalReport(bytes32 loanId, uint256 reportIndex)
+        public
+        view
+        loanIsMonitored(loanId)
+        returns (
+            CovenantStatus overallStatus,
+            TrendIndicator overallTrend,
+            uint256 overallConfidenceScore,
+            uint256 reportTimestamp,
+            string memory riskNarrative
+        )
+    {
+        require(reportIndex < reportCount[loanId], "LoanHealthFeed: Report index out of range");
+        LoanHealthReport storage report = reportHistory[loanId][reportIndex];
+        return (
+            report.overallStatus,
+            report.overallTrend,
+            report.overallConfidenceScore,
+            report.reportTimestamp,
+            report.riskNarrative
+        );
+    }
+
+    function getLoanSummary(bytes32 loanId)
+        public
+        view
+        loanIsMonitored(loanId)
+        returns (LoanHealthSummary memory)
+    {
+        LoanHealthReport storage latest = latestReports[loanId];
+        return LoanHealthSummary({
+            loanId: loanId,
+            overallStatus: latest.overallStatus,
+            overallTrend: latest.overallTrend,
+            overallConfidenceScore: latest.overallConfidenceScore,
+            lastUpdated: latest.reportTimestamp,
+            totalReports: reportCount[loanId],
+            totalBreaches: breachCount[loanId],
+            totalWarnings: warningCount[loanId]
+        });
+    }
+
+    function isLoanInBreach(bytes32 loanId) public view returns (bool) {
+        return isInBreach[loanId];
+    }
+
+    function getActiveBreaches() public view returns (bytes32[] memory) {
+        return activeBreaches;
+    }
+
+    function getRecentStatusHistory(bytes32 loanId, uint256 n)
+        public
+        view
+        loanIsMonitored(loanId)
+        returns (
+            CovenantStatus[] memory statuses,
+            uint256[] memory timestamps
+        )
+    {
+        uint256 total = reportCount[loanId];
+        uint256 count = n > total ? total : (n > 20 ? 20 : n);
+
+        statuses = new CovenantStatus[](count);
+        timestamps = new uint256[](count);
+
+        for (uint256 i = 0; i < count; i++) {
+            uint256 index = total - count + i;
+            LoanHealthReport storage report = reportHistory[loanId][index];
+            statuses[i] = report.overallStatus;
+            timestamps[i] = report.reportTimestamp;
+        }
+
+        return (statuses, timestamps);
+    }
+
+    function getMonitoredLoanCount() public view returns (uint256) {
+        return monitoredLoans.length;
+    }
+
+    function isLoanMonitored(bytes32 loanId) public view returns (bool) {
+        return isMonitored[loanId];
+    }
+
     function _updateBreachState(bytes32 loanId, CovenantStatus newStatus) internal {
         bool currentlyInBreach = isInBreach[loanId];
 
