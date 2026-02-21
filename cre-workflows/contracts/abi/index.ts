@@ -1,0 +1,1 @@
+export { LoanRegistryAbi } from './LoanRegistry'

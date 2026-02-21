@@ -1,0 +1,8 @@
+{
+  "aiProvider": "openai",
+  "aiModel": "gpt-4o",
+  "aiApiKey": "YOUR_CLAUDE_API_KEY_HERE",
+  "loanRegistryAddress": "0x0000000000000000000000000000000000000000",
+  "chainSelectorName": "ethereum-testnet-sepolia",
+  "gasLimit": "2000000"
+}

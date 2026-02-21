@@ -1,0 +1,33 @@
+{
+  "_comment": "This is the JSON the AI is expected to return after reading the sample loan document. All CRE nodes must agree on this exact structure (consensusIdenticalAggregation) before the workflow proceeds to the onchain write step.",
+
+  "reportingFrequencyDays": 90,
+
+  "covenantNames": [
+    "Maximum Total Net Leverage Ratio",
+    "Minimum Interest Coverage Ratio",
+    "Minimum Debt Service Coverage Ratio",
+    "Maximum Capital Expenditure Ratio",
+    "Minimum Liquidity Ratio"
+  ],
+
+  "metricDefinitions": [
+    "(Total Financial Indebtedness - Unrestricted Cash) / Adjusted EBITDA (TTM)",
+    "Adjusted EBITDA (TTM) / Total Cash Interest Expense (TTM)",
+    "(Adjusted EBITDA - Unfunded CapEx) / Total Debt Service (TTM)",
+    "Capital Expenditure / Adjusted Revenue (TTM)",
+    "Unrestricted Cash / Total Financial Indebtedness"
+  ],
+
+  "thresholds": [4.5, 2.5, 1.2, 0.12, 0.1],
+
+  "thresholdTypes": ["MAX", "MIN", "MIN", "MAX", "MIN"],
+
+  "ebitdaAdjustments": [
+    "Exclude: (i) non-recurring restructuring charges up to USD 3M p.a., (ii) non-cash stock-based compensation, (iii) gains/losses from asset disposals outside ordinary course, (iv) acquisition transaction fees",
+    "Same adjustments as Total Net Leverage Ratio",
+    "Same adjustments as Total Net Leverage Ratio; budgeted maintenance CapEx may be excluded from Unfunded CapEx where board-approved",
+    "Exclude: (i) CapEx financed by permitted acquisition debt, (ii) insurance proceeds reinvested in replacement assets within 180 days",
+    "Undrawn availability under committed revolving credit facilities with remaining term >= 12 months may be included in Unrestricted Cash"
+  ]
+}
