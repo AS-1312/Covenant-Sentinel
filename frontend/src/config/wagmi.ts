@@ -16,4 +16,4 @@ export const SUPPORTED_CHAINS = {
 export const PRIMARY_CHAIN = sepolia;
 export const PRIMARY_CHAIN_ID = sepolia.id;
 
-// Made with Bob
+
