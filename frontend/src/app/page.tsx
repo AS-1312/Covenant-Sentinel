@@ -74,14 +74,16 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50/50 text-gray-900 font-sans">
       {/* Header */}
-      <header className="border-b border-gray-200">
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
-              <FileText className="w-8 h-8 text-black" />
-              <h1 className="text-2xl font-bold text-black">
+              <div className="bg-black p-2 rounded-xl shadow-sm">
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+              <h1 className="text-xl font-bold tracking-tight text-gray-900">
                 Covenant Sentinel
               </h1>
             </div>
@@ -93,23 +95,23 @@ export default function Home() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {!isConnected ? (
-          <div className="text-center py-20">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-6">
-              <Upload className="w-8 h-8 text-gray-600" />
+          <div className="text-center py-32">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-white ring-1 ring-gray-900/5 shadow-sm rounded-2xl mb-8">
+              <Upload className="w-10 h-10 text-gray-400" />
             </div>
-            <h2 className="text-3xl font-bold text-black mb-4">
+            <h2 className="text-3xl font-bold text-gray-900 tracking-tight mb-4">
               Connect Your Wallet to Get Started
             </h2>
-            <p className="text-gray-600 text-lg mb-8 max-w-2xl mx-auto">
+            <p className="text-gray-500 text-lg mb-8 max-w-2xl mx-auto">
               Upload markdown content and token address to the blockchain.
               Connect your wallet to begin the process.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             {/* Upload Form */}
-            <div className="bg-white border border-gray-200 rounded-lg p-8 shadow-sm">
-              <h2 className="text-2xl font-bold text-black mb-6">
+            <div className="bg-white ring-1 ring-gray-900/5 rounded-2xl p-8 shadow-sm">
+              <h2 className="text-xl font-semibold tracking-tight text-gray-900 mb-6">
                 Upload Content
               </h2>
 
@@ -128,7 +130,7 @@ export default function Home() {
                     value={tokenAddress}
                     onChange={(e) => setTokenAddress(e.target.value)}
                     placeholder="0x..."
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all text-gray-900 placeholder-gray-400"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all text-gray-900 placeholder-gray-400"
                     disabled={isLoading}
                   />
                 </div>
@@ -156,7 +158,7 @@ export default function Home() {
                     onChange={(e) => setMarkdown(e.target.value)}
                     placeholder="# Enter your markdown here&#10;&#10;This is a **bold** text example."
                     rows={12}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all font-mono text-sm text-gray-900 placeholder-gray-400 resize-none"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all font-mono text-sm text-gray-900 placeholder-gray-400 resize-none"
                     disabled={isLoading}
                   />
                 </div>
@@ -167,7 +169,7 @@ export default function Home() {
                   disabled={
                     isLoading || !markdown.trim() || !tokenAddress.trim()
                   }
-                  className="w-full flex items-center justify-center space-x-2 px-6 py-4 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center space-x-2 px-6 py-3.5 bg-black text-white rounded-xl hover:bg-gray-800 transition-all shadow-sm font-medium hover:shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
                     <>
@@ -185,10 +187,10 @@ export default function Home() {
             </div>
 
             {/* Preview/Response Panel */}
-            <div className="bg-white border border-gray-200 rounded-lg p-8 shadow-sm">
+            <div className="bg-white ring-1 ring-gray-900/5 rounded-2xl p-8 shadow-sm min-h-[600px] flex flex-col">
               {showPreview && markdown ? (
-                <div>
-                  <h2 className="text-2xl font-bold text-black mb-6">
+                <div className="flex-1">
+                  <h2 className="text-xl font-semibold tracking-tight text-gray-900 mb-6">
                     Markdown Preview
                   </h2>
                   <div className="prose prose-sm max-w-none prose-headings:text-black prose-p:text-gray-900 prose-a:text-black prose-strong:text-black prose-code:text-black prose-pre:bg-gray-100 prose-pre:text-gray-900">
@@ -198,8 +200,8 @@ export default function Home() {
               ) : response ? (
                 <div>
                   <div className="flex items-center space-x-3 mb-6">
-                    <CheckCircle2 className="w-8 h-8 text-green-600" />
-                    <h2 className="text-2xl font-bold text-black">Success!</h2>
+                    <CheckCircle2 className="w-8 h-8 text-green-500" />
+                    <h2 className="text-xl font-semibold tracking-tight text-gray-900">Success!</h2>
                   </div>
 
                   {/* Transaction Hash */}
@@ -212,9 +214,9 @@ export default function Home() {
                         href={getEtherscanUrl(response.transactionHash)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center space-x-2 p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors group"
+                        className="flex items-center space-x-2 p-4 bg-gray-50/50 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors group"
                       >
-                        <code className="flex-1 text-sm text-gray-900 break-all font-mono">
+                        <code className="flex-1 text-sm text-gray-600 break-all font-mono">
                           {response.transactionHash}
                         </code>
                         <ExternalLink className="w-4 h-4 text-gray-600 group-hover:text-black flex-shrink-0" />
@@ -228,17 +230,17 @@ export default function Home() {
                       <h3 className="text-sm font-medium text-gray-900 mb-2">
                         Response Data
                       </h3>
-                      <pre className="p-4 bg-gray-50 border border-gray-200 rounded-lg overflow-x-auto text-sm text-gray-900">
+                      <pre className="p-4 bg-gray-50/50 border border-gray-200 rounded-xl overflow-x-auto text-sm text-gray-600 font-mono">
                         {JSON.stringify(response.data, null, 2)}
                       </pre>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-full text-center py-20">
+                <div className="flex items-center justify-center h-full text-center flex-1">
                   <div>
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-                      <FileText className="w-8 h-8 text-gray-600" />
+                    <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-50/50 ring-1 ring-gray-900/5 rounded-2xl mb-6">
+                      <FileText className="w-10 h-10 text-gray-400" />
                     </div>
                     <p className="text-gray-600">
                       {markdown
