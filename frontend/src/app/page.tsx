@@ -1,15 +1,21 @@
 "use client";
 
-import { useState } from 'react';
-import { WalletButton } from '@/components/wallet-button';
-import { useAccount } from 'wagmi';
-import { Upload, FileText, Loader2, ExternalLink, CheckCircle2 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { useState } from "react";
+import { WalletButton } from "@/components/wallet-button";
+import { useAccount } from "wagmi";
+import {
+  Upload,
+  FileText,
+  Loader2,
+  ExternalLink,
+  CheckCircle2,
+} from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 export default function Home() {
   const { isConnected } = useAccount();
-  const [markdown, setMarkdown] = useState('');
-  const [tokenAddress, setTokenAddress] = useState('');
+  const [markdown, setMarkdown] = useState("");
+  const [tokenAddress, setTokenAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState<{
     transactionHash?: string;
@@ -19,14 +25,14 @@ export default function Home() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!isConnected) {
-      alert('Please connect your wallet first');
+      alert("Please connect your wallet first");
       return;
     }
 
     if (!markdown.trim() || !tokenAddress.trim()) {
-      alert('Please fill in all fields');
+      alert("Please fill in all fields");
       return;
     }
 
@@ -36,25 +42,27 @@ export default function Home() {
     try {
       // Simulate workflow execution
       // Replace this with your actual workflow API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       // Mock response - replace with actual API response
       const mockResponse = {
-        transactionHash: '0x' + Array.from({ length: 64 }, () => 
-          Math.floor(Math.random() * 16).toString(16)
-        ).join(''),
+        transactionHash:
+          "0x" +
+          Array.from({ length: 64 }, () =>
+            Math.floor(Math.random() * 16).toString(16),
+          ).join(""),
         data: {
           markdown: markdown,
           tokenAddress: tokenAddress,
           timestamp: new Date().toISOString(),
-          status: 'success'
-        }
+          status: "success",
+        },
       };
 
       setResponse(mockResponse);
     } catch (error) {
-      console.error('Error:', error);
-      alert('An error occurred. Please try again.');
+      console.error("Error:", error);
+      alert("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +81,9 @@ export default function Home() {
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
               <FileText className="w-8 h-8 text-black" />
-              <h1 className="text-2xl font-bold text-black">Covenant Sentinel</h1>
+              <h1 className="text-2xl font-bold text-black">
+                Covenant Sentinel
+              </h1>
             </div>
             <WalletButton />
           </div>
@@ -91,7 +101,7 @@ export default function Home() {
               Connect Your Wallet to Get Started
             </h2>
             <p className="text-gray-600 text-lg mb-8 max-w-2xl mx-auto">
-              Upload markdown content and token address to the blockchain. 
+              Upload markdown content and token address to the blockchain.
               Connect your wallet to begin the process.
             </p>
           </div>
@@ -99,12 +109,17 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Upload Form */}
             <div className="bg-white border border-gray-200 rounded-lg p-8 shadow-sm">
-              <h2 className="text-2xl font-bold text-black mb-6">Upload Content</h2>
-              
+              <h2 className="text-2xl font-bold text-black mb-6">
+                Upload Content
+              </h2>
+
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Token Address Input */}
                 <div>
-                  <label htmlFor="tokenAddress" className="block text-sm font-medium text-gray-900 mb-2">
+                  <label
+                    htmlFor="tokenAddress"
+                    className="block text-sm font-medium text-gray-900 mb-2"
+                  >
                     Token Address
                   </label>
                   <input
@@ -121,7 +136,10 @@ export default function Home() {
                 {/* Markdown Input */}
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <label htmlFor="markdown" className="block text-sm font-medium text-gray-900">
+                    <label
+                      htmlFor="markdown"
+                      className="block text-sm font-medium text-gray-900"
+                    >
                       Markdown Content
                     </label>
                     <button
@@ -129,7 +147,7 @@ export default function Home() {
                       onClick={() => setShowPreview(!showPreview)}
                       className="text-sm text-gray-600 hover:text-black transition-colors"
                     >
-                      {showPreview ? 'Hide Preview' : 'Show Preview'}
+                      {showPreview ? "Hide Preview" : "Show Preview"}
                     </button>
                   </div>
                   <textarea
@@ -146,7 +164,9 @@ export default function Home() {
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  disabled={isLoading || !markdown.trim() || !tokenAddress.trim()}
+                  disabled={
+                    isLoading || !markdown.trim() || !tokenAddress.trim()
+                  }
                   className="w-full flex items-center justify-center space-x-2 px-6 py-4 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
@@ -168,8 +188,10 @@ export default function Home() {
             <div className="bg-white border border-gray-200 rounded-lg p-8 shadow-sm">
               {showPreview && markdown ? (
                 <div>
-                  <h2 className="text-2xl font-bold text-black mb-6">Markdown Preview</h2>
-                  <div className="prose prose-sm max-w-none prose-headings:text-black prose-p:text-gray-700 prose-a:text-black prose-strong:text-black prose-code:text-black prose-pre:bg-gray-100 prose-pre:text-gray-900">
+                  <h2 className="text-2xl font-bold text-black mb-6">
+                    Markdown Preview
+                  </h2>
+                  <div className="prose prose-sm max-w-none prose-headings:text-black prose-p:text-gray-900 prose-a:text-black prose-strong:text-black prose-code:text-black prose-pre:bg-gray-100 prose-pre:text-gray-900">
                     <ReactMarkdown>{markdown}</ReactMarkdown>
                   </div>
                 </div>
@@ -183,7 +205,9 @@ export default function Home() {
                   {/* Transaction Hash */}
                   {response.transactionHash && (
                     <div className="mb-6">
-                      <h3 className="text-sm font-medium text-gray-900 mb-2">Transaction Hash</h3>
+                      <h3 className="text-sm font-medium text-gray-900 mb-2">
+                        Transaction Hash
+                      </h3>
                       <a
                         href={getEtherscanUrl(response.transactionHash)}
                         target="_blank"
@@ -201,7 +225,9 @@ export default function Home() {
                   {/* Response Data */}
                   {response.data && (
                     <div>
-                      <h3 className="text-sm font-medium text-gray-900 mb-2">Response Data</h3>
+                      <h3 className="text-sm font-medium text-gray-900 mb-2">
+                        Response Data
+                      </h3>
                       <pre className="p-4 bg-gray-50 border border-gray-200 rounded-lg overflow-x-auto text-sm text-gray-900">
                         {JSON.stringify(response.data, null, 2)}
                       </pre>
@@ -215,7 +241,9 @@ export default function Home() {
                       <FileText className="w-8 h-8 text-gray-600" />
                     </div>
                     <p className="text-gray-600">
-                      {markdown ? 'Click "Show Preview" to see your markdown rendered' : 'Enter markdown content to see preview'}
+                      {markdown
+                        ? 'Click "Show Preview" to see your markdown rendered'
+                        : "Enter markdown content to see preview"}
                     </p>
                   </div>
                 </div>
@@ -236,5 +264,3 @@ export default function Home() {
     </div>
   );
 }
-
-
