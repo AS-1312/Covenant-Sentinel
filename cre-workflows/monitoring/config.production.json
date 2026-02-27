@@ -1,0 +1,13 @@
+{
+  "cronExpression": "0 0 * * *",
+  "reportingDate": "",
+  "loanId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "financialApiUrl": "https://api.your-fund-admin.com",
+  "loanRegistryAddress": "0x0000000000000000000000000000000000000000",
+  "loanHealthFeedAddress": "0x0000000000000000000000000000000000000000",
+  "chainSelectorName": "ethereum-testnet-sepolia",
+  "gasLimit": "3000000",
+  "aiProvider": "claude",
+  "aiModel": "claude-opus-4-6",
+  "aiApiKey": ""
+}

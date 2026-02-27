@@ -1,0 +1,13 @@
+{
+  "cronExpression": "0 0 * * *",
+  "reportingDate": "2026-07-15",
+  "loanId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "financialApiUrl": "http://localhost:3000",
+  "loanRegistryAddress": "0x0000000000000000000000000000000000000000",
+  "loanHealthFeedAddress": "0x0000000000000000000000000000000000000000",
+  "chainSelectorName": "ethereum-testnet-sepolia",
+  "gasLimit": "3000000",
+  "aiProvider": "claude",
+  "aiModel": "claude-haiku-4-5-20251001",
+  "aiApiKey": "YOUR_KEY_HERE"
+}
