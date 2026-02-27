@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-contract LoanHealthFeed {
+import {IReceiverTemplate} from "./interfaces/IReceiverTemplate.sol";
+
+contract LoanHealthFeed is IReceiverTemplate {
     struct CovenantReport {
         string covenantName;            // e.g., "Maximum Leverage Ratio"
         CovenantStatus status;          // PASS / WARNING / BREACH
@@ -125,16 +127,37 @@ contract LoanHealthFeed {
     }
 
 
-    constructor() {}
+    constructor(
+        address _expectedAuthor,
+        bytes10 _expectedWorkflowName
+    ) IReceiverTemplate(_expectedAuthor, _expectedWorkflowName) {}
+
+    /**
+     * @notice Receive report from Forwarder
+     * @param metadata Encoded metadata (not used in testing version)
+     * @param report Encoded report containing loan and covenant details
+     */
+    function onReport(bytes calldata metadata, bytes calldata report) external override {        
+        _processReport(report);
+    }
+
+    /**
+     * @notice Process the mint or redeem instruction
+     * @param report ABI-encoded report containing loan and covenant details
+     */
+    function _processReport(bytes calldata report) internal override {
+        PublishReportInput memory input = abi.decode(report, (PublishReportInput));
+        _publishHealthReport(input);
+    }
 
     /**
      * @notice Publish a new loan health report
      * @dev Called by the CRE monitoring workflow after multi-model consensus
      * @param input Bundled report data from the CRE workflow
      */
-    function publishHealthReport(
-        PublishReportInput calldata input
-    ) external {
+    function _publishHealthReport(
+        PublishReportInput memory input
+    ) internal {
         if (input.covenantNames.length == 0) {
             revert AtleastOneCovenantRequired(input.loanId);
         }
@@ -226,7 +249,7 @@ contract LoanHealthFeed {
      * @notice Deactivate monitoring for a loan (e.g., loan fully repaid)
      */
     function deactivateLoan(bytes32 loanId)
-        external
+        public
         loanIsMonitored(loanId)
     {
         latestReports[loanId].isActive = false;
@@ -407,5 +430,21 @@ contract LoanHealthFeed {
         if (!isMonitored[loanId]) {
             revert LoanNotMonitored(loanId);
         }
+    }
+
+    /**
+     * @notice ERC165 interface support.
+     * @dev Overrides PolicyProtected's supportsInterface to include CRE receiver interface.
+     * @param interfaceId The interface identifier to check.
+     * @return True if the interface is supported.
+     */
+    function supportsInterface(bytes4 interfaceId) 
+        public 
+        pure 
+        virtual 
+        override 
+        returns (bool) 
+    {
+        return interfaceId == this.onReport.selector || super.supportsInterface(interfaceId);
     }
 }

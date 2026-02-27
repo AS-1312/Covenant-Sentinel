@@ -24,7 +24,7 @@ contract LoanRegistry is IReceiverTemplate {
         bool exists;                    // Whether this loan is registered
     }
 
-    mapping(bytes32 => LoanSchema) private loanSchemas;
+    mapping(bytes32 => LoanSchema) loanSchemas;
 
     bytes32[] public registeredLoans;
 
@@ -134,7 +134,7 @@ contract LoanRegistry is IReceiverTemplate {
         uint256[] memory thresholds,
         string[] memory thresholdTypes,
         string[] memory ebitdaAdjustments
-    ) private {
+    ) internal {
         if (loanSchemas[loanId].exists) {
             revert LoanAlreadyRegistered(loanId);
         }

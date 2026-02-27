@@ -15,7 +15,7 @@ contract DeployScript is Script {
         vm.startBroadcast();
 
         loanRegistry = new LoanRegistry(address(0), bytes10("dummy"));
-        loanHealthFeed = new LoanHealthFeed();
+        loanHealthFeed = new LoanHealthFeed(address(0), bytes10("dummy"));
 
         vm.stopBroadcast();
     }
