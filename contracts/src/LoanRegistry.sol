@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {IReceiverTemplate} from "./interfaces/IReceiverTemplate.sol";
 
-contract LoanRegistry is AccessControl {
+contract LoanRegistry is IReceiverTemplate {
     struct Covenant {
         string name;                    // e.g., "Maximum Leverage Ratio"
         string metricDefinition;        // e.g., "Total Debt / EBITDA"
@@ -23,8 +23,6 @@ contract LoanRegistry is AccessControl {
         mapping(string => Covenant) covenants;  // Covenant name => Covenant data
         bool exists;                    // Whether this loan is registered
     }
-    
-    bytes32 public constant WORKFLOW_ROLE = keccak256("WORKFLOW_ROLE");
 
     mapping(bytes32 => LoanSchema) private loanSchemas;
 
@@ -68,9 +66,50 @@ contract LoanRegistry is AccessControl {
     }
 
 
-    constructor(address authorizedWorkflow) {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(WORKFLOW_ROLE, authorizedWorkflow);
+    constructor(
+        address _expectedAuthor,
+        bytes10 _expectedWorkflowName
+    ) IReceiverTemplate(_expectedAuthor, _expectedWorkflowName) {}
+
+    /**
+     * @notice Receive report from Forwarder
+     * @param metadata Encoded metadata (not used in testing version)
+     * @param report Encoded report containing loan and covenant details
+     */
+    function onReport(bytes calldata metadata, bytes calldata report) external override {        
+        _processReport(report);
+    }
+
+    /**
+     * @notice Process the mint or redeem instruction
+     * @param report ABI-encoded report containing loan and covenant details
+     */
+    function _processReport(bytes calldata report) internal override {
+        // Decode the report
+        (bytes32 loanId,
+        address tokenAddress,
+        uint256 principalAmount,
+        uint256 reportingFrequency,
+        string[] memory covenantNames,
+        string[] memory metricDefinitions,
+        uint256[] memory thresholds,
+        string[] memory thresholdTypes,
+        string[] memory ebitdaAdjustments) = abi.decode(
+            report,
+            (bytes32, address, uint256, uint256, string[], string[] , uint256[], string[], string[])
+        );
+        
+        _registerLoan(
+            loanId,
+            tokenAddress,
+            principalAmount,
+            reportingFrequency,
+            covenantNames,
+            metricDefinitions,
+            thresholds,
+            thresholdTypes,
+            ebitdaAdjustments
+        );
     }
 
     /**
@@ -85,17 +124,17 @@ contract LoanRegistry is AccessControl {
      * @param thresholdTypes Array of threshold types ("MAX" or "MIN")
      * @param ebitdaAdjustments Array of EBITDA calculation rules
      */
-    function registerLoan(
+    function _registerLoan(
         bytes32 loanId,
         address tokenAddress,
         uint256 principalAmount,
         uint256 reportingFrequency,
-        string[] calldata covenantNames,
-        string[] calldata metricDefinitions,
-        uint256[] calldata thresholds,
-        string[] calldata thresholdTypes,
-        string[] calldata ebitdaAdjustments
-    ) external onlyRole(WORKFLOW_ROLE) {
+        string[] memory covenantNames,
+        string[] memory metricDefinitions,
+        uint256[] memory thresholds,
+        string[] memory thresholdTypes,
+        string[] memory ebitdaAdjustments
+    ) private {
         if (loanSchemas[loanId].exists) {
             revert LoanAlreadyRegistered(loanId);
         }
@@ -154,7 +193,7 @@ contract LoanRegistry is AccessControl {
         bytes32 loanId,
         string calldata covenantName,
         uint256 newThreshold
-    ) external onlyRole(WORKFLOW_ROLE) loanExists(loanId) {
+    ) public loanExists(loanId) {
         Covenant storage covenant = loanSchemas[loanId].covenants[covenantName];
         if (bytes(covenant.name).length == 0) {
             revert ConvenantNotFound(loanId, covenantName);
@@ -170,7 +209,7 @@ contract LoanRegistry is AccessControl {
     function deactivateCovenant(
         bytes32 loanId,
         string calldata covenantName
-    ) external onlyRole(WORKFLOW_ROLE) loanExists(loanId) {
+    ) public loanExists(loanId) {
         Covenant storage covenant = loanSchemas[loanId].covenants[covenantName];
         if (bytes(covenant.name).length == 0) {
             revert ConvenantNotFound(loanId, covenantName);
@@ -266,5 +305,21 @@ contract LoanRegistry is AccessControl {
         if (!loanSchemas[loanId].exists) {
             revert LoanNotRegistered(loanId);
         }
+    }
+
+    /**
+     * @notice ERC165 interface support.
+     * @dev Overrides PolicyProtected's supportsInterface to include CRE receiver interface.
+     * @param interfaceId The interface identifier to check.
+     * @return True if the interface is supported.
+     */
+    function supportsInterface(bytes4 interfaceId) 
+        public 
+        pure 
+        virtual 
+        override 
+        returns (bool) 
+    {
+        return interfaceId == this.onReport.selector || super.supportsInterface(interfaceId);
     }
 }

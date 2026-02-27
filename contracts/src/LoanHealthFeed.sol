@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-
-contract LoanHealthFeed is AccessControl {
+contract LoanHealthFeed {
     struct CovenantReport {
         string covenantName;            // e.g., "Maximum Leverage Ratio"
         CovenantStatus status;          // PASS / WARNING / BREACH
@@ -68,8 +66,6 @@ contract LoanHealthFeed is AccessControl {
     mapping(bytes32 => LoanHealthReport) latestReports;
     mapping(bytes32 => mapping(uint256 => LoanHealthReport)) reportHistory;
 
-    bytes32 public constant WORKFLOW_ROLE = keccak256("WORKFLOW_ROLE");
-
     mapping(bytes32 => uint256) public reportCount;
     mapping(bytes32 => uint256) public breachCount;
     bytes32[] public monitoredLoans;
@@ -129,10 +125,7 @@ contract LoanHealthFeed is AccessControl {
     }
 
 
-    constructor(address authorizedWorkflow) {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(WORKFLOW_ROLE, authorizedWorkflow);
-    }
+    constructor() {}
 
     /**
      * @notice Publish a new loan health report
@@ -141,7 +134,7 @@ contract LoanHealthFeed is AccessControl {
      */
     function publishHealthReport(
         PublishReportInput calldata input
-    ) external onlyRole(WORKFLOW_ROLE) {
+    ) external {
         if (input.covenantNames.length == 0) {
             revert AtleastOneCovenantRequired(input.loanId);
         }
@@ -234,7 +227,6 @@ contract LoanHealthFeed is AccessControl {
      */
     function deactivateLoan(bytes32 loanId)
         external
-        onlyRole(WORKFLOW_ROLE)
         loanIsMonitored(loanId)
     {
         latestReports[loanId].isActive = false;

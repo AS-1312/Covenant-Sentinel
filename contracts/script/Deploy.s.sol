@@ -14,10 +14,8 @@ contract DeployScript is Script {
     function run() public {
         vm.startBroadcast();
 
-        address workflowAddress = 0x1234567890123456789012345678901234567890; // Replace with actual workflow address
-
-        loanRegistry = new LoanRegistry(workflowAddress);
-        loanHealthFeed = new LoanHealthFeed(workflowAddress);
+        loanRegistry = new LoanRegistry(address(0), bytes10("dummy"));
+        loanHealthFeed = new LoanHealthFeed();
 
         vm.stopBroadcast();
     }
