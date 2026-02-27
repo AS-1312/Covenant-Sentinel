@@ -76,10 +76,6 @@ const configSchema = z.object({
 	aiProvider: z.enum(['claude', 'openai']),
 	// Model name, e.g. 'claude-haiku-4-5-20251001' or 'gpt-4o'
 	aiModel: z.string(),
-	// FOR LOCAL SIMULATION ONLY: set the API key directly in config.
-	// runtime.getSecret() only works on deployed DON nodes, not in the simulator.
-	// Leave empty string ("") for production — the workflow uses runtime.getSecret() instead.
-	aiApiKey: z.string().default(''),
 })
 
 type Config = z.infer<typeof configSchema>

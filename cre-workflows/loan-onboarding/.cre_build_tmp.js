@@ -10,91 +10,589 @@ var __export = (target, all) => {
     });
 };
 var __esm = (fn, res) => () => (fn && (res = fn(fn = 0)), res);
+var version = "1.0.8";
+var BaseError;
+var init_errors = __esm(() => {
+  BaseError = class BaseError2 extends Error {
+    constructor(shortMessage, args = {}) {
+      const details = args.cause instanceof BaseError2 ? args.cause.details : args.cause?.message ? args.cause.message : args.details;
+      const docsPath = args.cause instanceof BaseError2 ? args.cause.docsPath || args.docsPath : args.docsPath;
+      const message = [
+        shortMessage || "An error occurred.",
+        "",
+        ...args.metaMessages ? [...args.metaMessages, ""] : [],
+        ...docsPath ? [`Docs: https://abitype.dev${docsPath}`] : [],
+        ...details ? [`Details: ${details}`] : [],
+        `Version: abitype@${version}`
+      ].join(`
+`);
+      super(message);
+      Object.defineProperty(this, "details", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      Object.defineProperty(this, "docsPath", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      Object.defineProperty(this, "metaMessages", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      Object.defineProperty(this, "shortMessage", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "AbiTypeError"
+      });
+      if (args.cause)
+        this.cause = args.cause;
+      this.details = details;
+      this.docsPath = docsPath;
+      this.metaMessages = args.metaMessages;
+      this.shortMessage = shortMessage;
+    }
+  };
+});
 function execTyped(regex, string) {
   const match = regex.exec(string);
   return match?.groups;
 }
-var init_regex = () => {};
-function formatAbiParameter(abiParameter) {
-  let type = abiParameter.type;
-  if (tupleRegex.test(abiParameter.type) && "components" in abiParameter) {
-    type = "(";
-    const length = abiParameter.components.length;
-    for (let i2 = 0;i2 < length; i2++) {
-      const component = abiParameter.components[i2];
-      type += formatAbiParameter(component);
-      if (i2 < length - 1)
-        type += ", ";
-    }
-    const result = execTyped(tupleRegex, abiParameter.type);
-    type += `)${result?.array ?? ""}`;
-    return formatAbiParameter({
-      ...abiParameter,
-      type
-    });
-  }
-  if ("indexed" in abiParameter && abiParameter.indexed)
-    type = `${type} indexed`;
-  if (abiParameter.name)
-    return `${type} ${abiParameter.name}`;
-  return type;
-}
-var tupleRegex;
-var init_formatAbiParameter = __esm(() => {
-  init_regex();
-  tupleRegex = /^tuple(?<array>(\[(\d*)\])*)$/;
+var bytesRegex;
+var integerRegex;
+var isTupleRegex;
+var init_regex = __esm(() => {
+  bytesRegex = /^bytes([1-9]|1[0-9]|2[0-9]|3[0-2])?$/;
+  integerRegex = /^u?int(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)?$/;
+  isTupleRegex = /^\(.+?\).*?$/;
 });
-function formatAbiParameters(abiParameters) {
-  let params = "";
+function isStructSignature(signature) {
+  return structSignatureRegex.test(signature);
+}
+function execStructSignature(signature) {
+  return execTyped(structSignatureRegex, signature);
+}
+var structSignatureRegex;
+var modifiers;
+var eventModifiers;
+var functionModifiers;
+var init_signatures = __esm(() => {
+  init_regex();
+  structSignatureRegex = /^struct (?<name>[a-zA-Z$_][a-zA-Z0-9$_]*) \{(?<properties>.*?)\}$/;
+  modifiers = new Set([
+    "memory",
+    "indexed",
+    "storage",
+    "calldata"
+  ]);
+  eventModifiers = new Set(["indexed"]);
+  functionModifiers = new Set([
+    "calldata",
+    "memory",
+    "storage"
+  ]);
+});
+var UnknownTypeError;
+var UnknownSolidityTypeError;
+var init_abiItem = __esm(() => {
+  init_errors();
+  UnknownTypeError = class UnknownTypeError2 extends BaseError {
+    constructor({ type }) {
+      super("Unknown type.", {
+        metaMessages: [
+          `Type "${type}" is not a valid ABI type. Perhaps you forgot to include a struct signature?`
+        ]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "UnknownTypeError"
+      });
+    }
+  };
+  UnknownSolidityTypeError = class UnknownSolidityTypeError2 extends BaseError {
+    constructor({ type }) {
+      super("Unknown type.", {
+        metaMessages: [`Type "${type}" is not a valid ABI type.`]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "UnknownSolidityTypeError"
+      });
+    }
+  };
+});
+var InvalidAbiParametersError;
+var InvalidParameterError;
+var SolidityProtectedKeywordError;
+var InvalidModifierError;
+var InvalidFunctionModifierError;
+var InvalidAbiTypeParameterError;
+var init_abiParameter = __esm(() => {
+  init_errors();
+  InvalidAbiParametersError = class InvalidAbiParametersError2 extends BaseError {
+    constructor({ params }) {
+      super("Failed to parse ABI parameters.", {
+        details: `parseAbiParameters(${JSON.stringify(params, null, 2)})`,
+        docsPath: "/api/human#parseabiparameters-1"
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidAbiParametersError"
+      });
+    }
+  };
+  InvalidParameterError = class InvalidParameterError2 extends BaseError {
+    constructor({ param }) {
+      super("Invalid ABI parameter.", {
+        details: param
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidParameterError"
+      });
+    }
+  };
+  SolidityProtectedKeywordError = class SolidityProtectedKeywordError2 extends BaseError {
+    constructor({ param, name }) {
+      super("Invalid ABI parameter.", {
+        details: param,
+        metaMessages: [
+          `"${name}" is a protected Solidity keyword. More info: https://docs.soliditylang.org/en/latest/cheatsheet.html`
+        ]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "SolidityProtectedKeywordError"
+      });
+    }
+  };
+  InvalidModifierError = class InvalidModifierError2 extends BaseError {
+    constructor({ param, type, modifier }) {
+      super("Invalid ABI parameter.", {
+        details: param,
+        metaMessages: [
+          `Modifier "${modifier}" not allowed${type ? ` in "${type}" type` : ""}.`
+        ]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidModifierError"
+      });
+    }
+  };
+  InvalidFunctionModifierError = class InvalidFunctionModifierError2 extends BaseError {
+    constructor({ param, type, modifier }) {
+      super("Invalid ABI parameter.", {
+        details: param,
+        metaMessages: [
+          `Modifier "${modifier}" not allowed${type ? ` in "${type}" type` : ""}.`,
+          `Data location can only be specified for array, struct, or mapping types, but "${modifier}" was given.`
+        ]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidFunctionModifierError"
+      });
+    }
+  };
+  InvalidAbiTypeParameterError = class InvalidAbiTypeParameterError2 extends BaseError {
+    constructor({ abiParameter }) {
+      super("Invalid ABI parameter.", {
+        details: JSON.stringify(abiParameter, null, 2),
+        metaMessages: ["ABI parameter type is invalid."]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidAbiTypeParameterError"
+      });
+    }
+  };
+});
+var InvalidSignatureError;
+var InvalidStructSignatureError;
+var init_signature = __esm(() => {
+  init_errors();
+  InvalidSignatureError = class InvalidSignatureError2 extends BaseError {
+    constructor({ signature, type }) {
+      super(`Invalid ${type} signature.`, {
+        details: signature
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidSignatureError"
+      });
+    }
+  };
+  InvalidStructSignatureError = class InvalidStructSignatureError2 extends BaseError {
+    constructor({ signature }) {
+      super("Invalid struct signature.", {
+        details: signature,
+        metaMessages: ["No properties exist."]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidStructSignatureError"
+      });
+    }
+  };
+});
+var CircularReferenceError;
+var init_struct = __esm(() => {
+  init_errors();
+  CircularReferenceError = class CircularReferenceError2 extends BaseError {
+    constructor({ type }) {
+      super("Circular reference detected.", {
+        metaMessages: [`Struct "${type}" is a circular reference.`]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "CircularReferenceError"
+      });
+    }
+  };
+});
+var InvalidParenthesisError;
+var init_splitParameters = __esm(() => {
+  init_errors();
+  InvalidParenthesisError = class InvalidParenthesisError2 extends BaseError {
+    constructor({ current, depth }) {
+      super("Unbalanced parentheses.", {
+        metaMessages: [
+          `"${current.trim()}" has too many ${depth > 0 ? "opening" : "closing"} parentheses.`
+        ],
+        details: `Depth "${depth}"`
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidParenthesisError"
+      });
+    }
+  };
+});
+function getParameterCacheKey(param, type, structs) {
+  let structKey = "";
+  if (structs)
+    for (const struct of Object.entries(structs)) {
+      if (!struct)
+        continue;
+      let propertyKey = "";
+      for (const property of struct[1]) {
+        propertyKey += `[${property.type}${property.name ? `:${property.name}` : ""}]`;
+      }
+      structKey += `(${struct[0]}{${propertyKey}})`;
+    }
+  if (type)
+    return `${type}:${param}${structKey}`;
+  return param;
+}
+var parameterCache;
+var init_cache = __esm(() => {
+  parameterCache = new Map([
+    ["address", { type: "address" }],
+    ["bool", { type: "bool" }],
+    ["bytes", { type: "bytes" }],
+    ["bytes32", { type: "bytes32" }],
+    ["int", { type: "int256" }],
+    ["int256", { type: "int256" }],
+    ["string", { type: "string" }],
+    ["uint", { type: "uint256" }],
+    ["uint8", { type: "uint8" }],
+    ["uint16", { type: "uint16" }],
+    ["uint24", { type: "uint24" }],
+    ["uint32", { type: "uint32" }],
+    ["uint64", { type: "uint64" }],
+    ["uint96", { type: "uint96" }],
+    ["uint112", { type: "uint112" }],
+    ["uint160", { type: "uint160" }],
+    ["uint192", { type: "uint192" }],
+    ["uint256", { type: "uint256" }],
+    ["address owner", { type: "address", name: "owner" }],
+    ["address to", { type: "address", name: "to" }],
+    ["bool approved", { type: "bool", name: "approved" }],
+    ["bytes _data", { type: "bytes", name: "_data" }],
+    ["bytes data", { type: "bytes", name: "data" }],
+    ["bytes signature", { type: "bytes", name: "signature" }],
+    ["bytes32 hash", { type: "bytes32", name: "hash" }],
+    ["bytes32 r", { type: "bytes32", name: "r" }],
+    ["bytes32 root", { type: "bytes32", name: "root" }],
+    ["bytes32 s", { type: "bytes32", name: "s" }],
+    ["string name", { type: "string", name: "name" }],
+    ["string symbol", { type: "string", name: "symbol" }],
+    ["string tokenURI", { type: "string", name: "tokenURI" }],
+    ["uint tokenId", { type: "uint256", name: "tokenId" }],
+    ["uint8 v", { type: "uint8", name: "v" }],
+    ["uint256 balance", { type: "uint256", name: "balance" }],
+    ["uint256 tokenId", { type: "uint256", name: "tokenId" }],
+    ["uint256 value", { type: "uint256", name: "value" }],
+    [
+      "event:address indexed from",
+      { type: "address", name: "from", indexed: true }
+    ],
+    ["event:address indexed to", { type: "address", name: "to", indexed: true }],
+    [
+      "event:uint indexed tokenId",
+      { type: "uint256", name: "tokenId", indexed: true }
+    ],
+    [
+      "event:uint256 indexed tokenId",
+      { type: "uint256", name: "tokenId", indexed: true }
+    ]
+  ]);
+});
+function parseAbiParameter(param, options) {
+  const parameterCacheKey = getParameterCacheKey(param, options?.type, options?.structs);
+  if (parameterCache.has(parameterCacheKey))
+    return parameterCache.get(parameterCacheKey);
+  const isTuple = isTupleRegex.test(param);
+  const match = execTyped(isTuple ? abiParameterWithTupleRegex : abiParameterWithoutTupleRegex, param);
+  if (!match)
+    throw new InvalidParameterError({ param });
+  if (match.name && isSolidityKeyword(match.name))
+    throw new SolidityProtectedKeywordError({ param, name: match.name });
+  const name = match.name ? { name: match.name } : {};
+  const indexed = match.modifier === "indexed" ? { indexed: true } : {};
+  const structs = options?.structs ?? {};
+  let type;
+  let components = {};
+  if (isTuple) {
+    type = "tuple";
+    const params = splitParameters(match.type);
+    const components_ = [];
+    const length = params.length;
+    for (let i2 = 0;i2 < length; i2++) {
+      components_.push(parseAbiParameter(params[i2], { structs }));
+    }
+    components = { components: components_ };
+  } else if (match.type in structs) {
+    type = "tuple";
+    components = { components: structs[match.type] };
+  } else if (dynamicIntegerRegex.test(match.type)) {
+    type = `${match.type}256`;
+  } else {
+    type = match.type;
+    if (!(options?.type === "struct") && !isSolidityType(type))
+      throw new UnknownSolidityTypeError({ type });
+  }
+  if (match.modifier) {
+    if (!options?.modifiers?.has?.(match.modifier))
+      throw new InvalidModifierError({
+        param,
+        type: options?.type,
+        modifier: match.modifier
+      });
+    if (functionModifiers.has(match.modifier) && !isValidDataLocation(type, !!match.array))
+      throw new InvalidFunctionModifierError({
+        param,
+        type: options?.type,
+        modifier: match.modifier
+      });
+  }
+  const abiParameter = {
+    type: `${type}${match.array ?? ""}`,
+    ...name,
+    ...indexed,
+    ...components
+  };
+  parameterCache.set(parameterCacheKey, abiParameter);
+  return abiParameter;
+}
+function splitParameters(params, result = [], current = "", depth = 0) {
+  const length = params.trim().length;
+  for (let i2 = 0;i2 < length; i2++) {
+    const char = params[i2];
+    const tail = params.slice(i2 + 1);
+    switch (char) {
+      case ",":
+        return depth === 0 ? splitParameters(tail, [...result, current.trim()]) : splitParameters(tail, result, `${current}${char}`, depth);
+      case "(":
+        return splitParameters(tail, result, `${current}${char}`, depth + 1);
+      case ")":
+        return splitParameters(tail, result, `${current}${char}`, depth - 1);
+      default:
+        return splitParameters(tail, result, `${current}${char}`, depth);
+    }
+  }
+  if (current === "")
+    return result;
+  if (depth !== 0)
+    throw new InvalidParenthesisError({ current, depth });
+  result.push(current.trim());
+  return result;
+}
+function isSolidityType(type) {
+  return type === "address" || type === "bool" || type === "function" || type === "string" || bytesRegex.test(type) || integerRegex.test(type);
+}
+function isSolidityKeyword(name) {
+  return name === "address" || name === "bool" || name === "function" || name === "string" || name === "tuple" || bytesRegex.test(name) || integerRegex.test(name) || protectedKeywordsRegex.test(name);
+}
+function isValidDataLocation(type, isArray) {
+  return isArray || type === "bytes" || type === "string" || type === "tuple";
+}
+var abiParameterWithoutTupleRegex;
+var abiParameterWithTupleRegex;
+var dynamicIntegerRegex;
+var protectedKeywordsRegex;
+var init_utils = __esm(() => {
+  init_regex();
+  init_abiItem();
+  init_abiParameter();
+  init_splitParameters();
+  init_cache();
+  init_signatures();
+  abiParameterWithoutTupleRegex = /^(?<type>[a-zA-Z$_][a-zA-Z0-9$_]*)(?<array>(?:\[\d*?\])+?)?(?:\s(?<modifier>calldata|indexed|memory|storage{1}))?(?:\s(?<name>[a-zA-Z$_][a-zA-Z0-9$_]*))?$/;
+  abiParameterWithTupleRegex = /^\((?<type>.+?)\)(?<array>(?:\[\d*?\])+?)?(?:\s(?<modifier>calldata|indexed|memory|storage{1}))?(?:\s(?<name>[a-zA-Z$_][a-zA-Z0-9$_]*))?$/;
+  dynamicIntegerRegex = /^u?int$/;
+  protectedKeywordsRegex = /^(?:after|alias|anonymous|apply|auto|byte|calldata|case|catch|constant|copyof|default|defined|error|event|external|false|final|function|immutable|implements|in|indexed|inline|internal|let|mapping|match|memory|mutable|null|of|override|partial|private|promise|public|pure|reference|relocatable|return|returns|sizeof|static|storage|struct|super|supports|switch|this|true|try|typedef|typeof|var|view|virtual)$/;
+});
+function parseStructs(signatures) {
+  const shallowStructs = {};
+  const signaturesLength = signatures.length;
+  for (let i2 = 0;i2 < signaturesLength; i2++) {
+    const signature = signatures[i2];
+    if (!isStructSignature(signature))
+      continue;
+    const match = execStructSignature(signature);
+    if (!match)
+      throw new InvalidSignatureError({ signature, type: "struct" });
+    const properties = match.properties.split(";");
+    const components = [];
+    const propertiesLength = properties.length;
+    for (let k = 0;k < propertiesLength; k++) {
+      const property = properties[k];
+      const trimmed = property.trim();
+      if (!trimmed)
+        continue;
+      const abiParameter = parseAbiParameter(trimmed, {
+        type: "struct"
+      });
+      components.push(abiParameter);
+    }
+    if (!components.length)
+      throw new InvalidStructSignatureError({ signature });
+    shallowStructs[match.name] = components;
+  }
+  const resolvedStructs = {};
+  const entries = Object.entries(shallowStructs);
+  const entriesLength = entries.length;
+  for (let i2 = 0;i2 < entriesLength; i2++) {
+    const [name, parameters] = entries[i2];
+    resolvedStructs[name] = resolveStructs(parameters, shallowStructs);
+  }
+  return resolvedStructs;
+}
+function resolveStructs(abiParameters, structs, ancestors = new Set) {
+  const components = [];
   const length = abiParameters.length;
   for (let i2 = 0;i2 < length; i2++) {
     const abiParameter = abiParameters[i2];
-    params += formatAbiParameter(abiParameter);
-    if (i2 !== length - 1)
-      params += ", ";
+    const isTuple = isTupleRegex.test(abiParameter.type);
+    if (isTuple)
+      components.push(abiParameter);
+    else {
+      const match = execTyped(typeWithoutTupleRegex, abiParameter.type);
+      if (!match?.type)
+        throw new InvalidAbiTypeParameterError({ abiParameter });
+      const { array, type } = match;
+      if (type in structs) {
+        if (ancestors.has(type))
+          throw new CircularReferenceError({ type });
+        components.push({
+          ...abiParameter,
+          type: `tuple${array ?? ""}`,
+          components: resolveStructs(structs[type] ?? [], structs, new Set([...ancestors, type]))
+        });
+      } else {
+        if (isSolidityType(type))
+          components.push(abiParameter);
+        else
+          throw new UnknownTypeError({ type });
+      }
+    }
   }
-  return params;
+  return components;
 }
-var init_formatAbiParameters = __esm(() => {
-  init_formatAbiParameter();
+var typeWithoutTupleRegex;
+var init_structs = __esm(() => {
+  init_regex();
+  init_abiItem();
+  init_abiParameter();
+  init_signature();
+  init_struct();
+  init_signatures();
+  init_utils();
+  typeWithoutTupleRegex = /^(?<type>[a-zA-Z$_][a-zA-Z0-9$_]*)(?<array>(?:\[\d*?\])+?)?$/;
 });
-function formatAbiItem(abiItem) {
-  if (abiItem.type === "function")
-    return `function ${abiItem.name}(${formatAbiParameters(abiItem.inputs)})${abiItem.stateMutability && abiItem.stateMutability !== "nonpayable" ? ` ${abiItem.stateMutability}` : ""}${abiItem.outputs?.length ? ` returns (${formatAbiParameters(abiItem.outputs)})` : ""}`;
-  if (abiItem.type === "event")
-    return `event ${abiItem.name}(${formatAbiParameters(abiItem.inputs)})`;
-  if (abiItem.type === "error")
-    return `error ${abiItem.name}(${formatAbiParameters(abiItem.inputs)})`;
-  if (abiItem.type === "constructor")
-    return `constructor(${formatAbiParameters(abiItem.inputs)})${abiItem.stateMutability === "payable" ? " payable" : ""}`;
-  if (abiItem.type === "fallback")
-    return `fallback() external${abiItem.stateMutability === "payable" ? " payable" : ""}`;
-  return "receive() external payable";
+function parseAbiParameters(params) {
+  const abiParameters = [];
+  if (typeof params === "string") {
+    const parameters = splitParameters(params);
+    const length = parameters.length;
+    for (let i2 = 0;i2 < length; i2++) {
+      abiParameters.push(parseAbiParameter(parameters[i2], { modifiers }));
+    }
+  } else {
+    const structs = parseStructs(params);
+    const length = params.length;
+    for (let i2 = 0;i2 < length; i2++) {
+      const signature = params[i2];
+      if (isStructSignature(signature))
+        continue;
+      const parameters = splitParameters(signature);
+      const length2 = parameters.length;
+      for (let k = 0;k < length2; k++) {
+        abiParameters.push(parseAbiParameter(parameters[k], { modifiers, structs }));
+      }
+    }
+  }
+  if (abiParameters.length === 0)
+    throw new InvalidAbiParametersError({ params });
+  return abiParameters;
 }
-var init_formatAbiItem = __esm(() => {
-  init_formatAbiParameters();
+var init_parseAbiParameters = __esm(() => {
+  init_abiParameter();
+  init_signatures();
+  init_structs();
+  init_utils();
+  init_utils();
 });
 var init_exports = __esm(() => {
-  init_formatAbiItem();
-});
-function formatAbiItem2(abiItem, { includeName = false } = {}) {
-  if (abiItem.type !== "function" && abiItem.type !== "event" && abiItem.type !== "error")
-    throw new InvalidDefinitionTypeError(abiItem.type);
-  return `${abiItem.name}(${formatAbiParams(abiItem.inputs, { includeName })})`;
-}
-function formatAbiParams(params, { includeName = false } = {}) {
-  if (!params)
-    return "";
-  return params.map((param) => formatAbiParam(param, { includeName })).join(includeName ? ", " : ",");
-}
-function formatAbiParam(param, { includeName }) {
-  if (param.type.startsWith("tuple")) {
-    return `(${formatAbiParams(param.components, { includeName })})${param.type.slice("tuple".length)}`;
-  }
-  return param.type + (includeName && param.name ? ` ${param.name}` : "");
-}
-var init_formatAbiItem2 = __esm(() => {
-  init_abi();
+  init_parseAbiParameters();
 });
 function isHex(value2, { strict = true } = {}) {
   if (!value2)
@@ -109,7 +607,7 @@ function size(value2) {
   return value2.length;
 }
 var init_size = () => {};
-var version = "2.34.0";
+var version2 = "2.34.0";
 function walk(err, fn) {
   if (fn?.(err))
     return err;
@@ -118,23 +616,23 @@ function walk(err, fn) {
   return fn ? null : err;
 }
 var errorConfig;
-var BaseError;
+var BaseError2;
 var init_base = __esm(() => {
   errorConfig = {
     getDocsUrl: ({ docsBaseUrl, docsPath = "", docsSlug }) => docsPath ? `${docsBaseUrl ?? "https://viem.sh"}${docsPath}${docsSlug ? `#${docsSlug}` : ""}` : undefined,
-    version: `viem@${version}`
+    version: `viem@${version2}`
   };
-  BaseError = class BaseError2 extends Error {
+  BaseError2 = class BaseError22 extends Error {
     constructor(shortMessage, args = {}) {
       const details = (() => {
-        if (args.cause instanceof BaseError2)
+        if (args.cause instanceof BaseError22)
           return args.cause.details;
         if (args.cause?.message)
           return args.cause.message;
         return args.details;
       })();
       const docsPath = (() => {
-        if (args.cause instanceof BaseError2)
+        if (args.cause instanceof BaseError22)
           return args.cause.docsPath || args.docsPath;
         return args.docsPath;
       })();
@@ -190,7 +688,7 @@ var init_base = __esm(() => {
       this.metaMessages = args.metaMessages;
       this.name = args.name ?? this.name;
       this.shortMessage = shortMessage;
-      this.version = version;
+      this.version = version2;
     }
     walk(fn) {
       return walk(this, fn);
@@ -200,16 +698,12 @@ var init_base = __esm(() => {
 var AbiEncodingArrayLengthMismatchError;
 var AbiEncodingBytesSizeMismatchError;
 var AbiEncodingLengthMismatchError;
-var AbiFunctionNotFoundError;
-var AbiItemAmbiguityError;
 var InvalidAbiEncodingTypeError;
 var InvalidArrayError;
-var InvalidDefinitionTypeError;
 var init_abi = __esm(() => {
-  init_formatAbiItem2();
   init_size();
   init_base();
-  AbiEncodingArrayLengthMismatchError = class AbiEncodingArrayLengthMismatchError2 extends BaseError {
+  AbiEncodingArrayLengthMismatchError = class AbiEncodingArrayLengthMismatchError2 extends BaseError2 {
     constructor({ expectedLength, givenLength, type }) {
       super([
         `ABI encoding array length mismatch for type ${type}.`,
@@ -219,12 +713,12 @@ var init_abi = __esm(() => {
 `), { name: "AbiEncodingArrayLengthMismatchError" });
     }
   };
-  AbiEncodingBytesSizeMismatchError = class AbiEncodingBytesSizeMismatchError2 extends BaseError {
+  AbiEncodingBytesSizeMismatchError = class AbiEncodingBytesSizeMismatchError2 extends BaseError2 {
     constructor({ expectedSize, value: value2 }) {
       super(`Size of bytes "${value2}" (bytes${size(value2)}) does not match expected size (bytes${expectedSize}).`, { name: "AbiEncodingBytesSizeMismatchError" });
     }
   };
-  AbiEncodingLengthMismatchError = class AbiEncodingLengthMismatchError2 extends BaseError {
+  AbiEncodingLengthMismatchError = class AbiEncodingLengthMismatchError2 extends BaseError2 {
     constructor({ expectedLength, givenLength }) {
       super([
         "ABI encoding params/values length mismatch.",
@@ -234,33 +728,7 @@ var init_abi = __esm(() => {
 `), { name: "AbiEncodingLengthMismatchError" });
     }
   };
-  AbiFunctionNotFoundError = class AbiFunctionNotFoundError2 extends BaseError {
-    constructor(functionName, { docsPath } = {}) {
-      super([
-        `Function ${functionName ? `"${functionName}" ` : ""}not found on ABI.`,
-        "Make sure you are using the correct ABI and that the function exists on it."
-      ].join(`
-`), {
-        docsPath,
-        name: "AbiFunctionNotFoundError"
-      });
-    }
-  };
-  AbiItemAmbiguityError = class AbiItemAmbiguityError2 extends BaseError {
-    constructor(x, y) {
-      super("Found ambiguous types in overloaded ABI items.", {
-        metaMessages: [
-          `\`${x.type}\` in \`${formatAbiItem2(x.abiItem)}\`, and`,
-          `\`${y.type}\` in \`${formatAbiItem2(y.abiItem)}\``,
-          "",
-          "These types encode differently and cannot be distinguished at runtime.",
-          "Remove one of the ambiguous items in the ABI."
-        ],
-        name: "AbiItemAmbiguityError"
-      });
-    }
-  };
-  InvalidAbiEncodingTypeError = class InvalidAbiEncodingTypeError2 extends BaseError {
+  InvalidAbiEncodingTypeError = class InvalidAbiEncodingTypeError2 extends BaseError2 {
     constructor(type, { docsPath }) {
       super([
         `Type "${type}" is not a valid encoding type.`,
@@ -269,7 +737,7 @@ var init_abi = __esm(() => {
 `), { docsPath, name: "InvalidAbiEncodingType" });
     }
   };
-  InvalidArrayError = class InvalidArrayError2 extends BaseError {
+  InvalidArrayError = class InvalidArrayError2 extends BaseError2 {
     constructor(value2) {
       super([`Value "${value2}" is not a valid array.`].join(`
 `), {
@@ -277,26 +745,17 @@ var init_abi = __esm(() => {
       });
     }
   };
-  InvalidDefinitionTypeError = class InvalidDefinitionTypeError2 extends BaseError {
-    constructor(type) {
-      super([
-        `"${type}" is not a valid definition type.`,
-        'Valid types: "function", "event", "error"'
-      ].join(`
-`), { name: "InvalidDefinitionTypeError" });
-    }
-  };
 });
 var SliceOffsetOutOfBoundsError;
 var SizeExceedsPaddingSizeError;
 var init_data = __esm(() => {
   init_base();
-  SliceOffsetOutOfBoundsError = class SliceOffsetOutOfBoundsError2 extends BaseError {
+  SliceOffsetOutOfBoundsError = class SliceOffsetOutOfBoundsError2 extends BaseError2 {
     constructor({ offset, position, size: size2 }) {
       super(`Slice ${position === "start" ? "starting" : "ending"} at offset "${offset}" is out-of-bounds (size: ${size2}).`, { name: "SliceOffsetOutOfBoundsError" });
     }
   };
-  SizeExceedsPaddingSizeError = class SizeExceedsPaddingSizeError2 extends BaseError {
+  SizeExceedsPaddingSizeError = class SizeExceedsPaddingSizeError2 extends BaseError2 {
     constructor({ size: size2, targetSize, type }) {
       super(`${type.charAt(0).toUpperCase()}${type.slice(1).toLowerCase()} size (${size2}) exceeds padding size (${targetSize}).`, { name: "SizeExceedsPaddingSizeError" });
     }
@@ -342,12 +801,12 @@ var IntegerOutOfRangeError;
 var SizeOverflowError;
 var init_encoding = __esm(() => {
   init_base();
-  IntegerOutOfRangeError = class IntegerOutOfRangeError2 extends BaseError {
+  IntegerOutOfRangeError = class IntegerOutOfRangeError2 extends BaseError2 {
     constructor({ max, min, signed, size: size2, value: value2 }) {
       super(`Number "${value2}" is not in safe ${size2 ? `${size2 * 8}-bit ${signed ? "signed" : "unsigned"} ` : ""}integer range ${max ? `(${min} to ${max})` : `(above ${min})`}`, { name: "IntegerOutOfRangeError" });
     }
   };
-  SizeOverflowError = class SizeOverflowError2 extends BaseError {
+  SizeOverflowError = class SizeOverflowError2 extends BaseError2 {
     constructor({ givenSize, maxSize }) {
       super(`Size cannot exceed ${maxSize} bytes. Given size: ${givenSize} bytes.`, { name: "SizeOverflowError" });
     }
@@ -477,7 +936,7 @@ function hexToBytes2(hex_, opts = {}) {
     const nibbleLeft = charCodeToBase16(hexString.charCodeAt(j++));
     const nibbleRight = charCodeToBase16(hexString.charCodeAt(j++));
     if (nibbleLeft === undefined || nibbleRight === undefined) {
-      throw new BaseError(`Invalid byte sequence ("${hexString[j - 2]}${hexString[j - 1]}" in "${hexString}").`);
+      throw new BaseError2(`Invalid byte sequence ("${hexString[j - 2]}${hexString[j - 1]}" in "${hexString}").`);
     }
     bytes[index] = nibbleLeft * 16 + nibbleRight;
   }
@@ -604,7 +1063,7 @@ function createHasher(hashCons) {
 }
 var isLE;
 var swap32IfBE;
-var init_utils = __esm(() => {
+var init_utils2 = __esm(() => {
   /*! noble-hashes - MIT License (c) 2022 Paul Miller (paulmillr.com) */
   isLE = /* @__PURE__ */ (() => new Uint8Array(new Uint32Array([287454020]).buffer)[0] === 68)();
   swap32IfBE = isLE ? (u) => u : byteSwap32;
@@ -668,7 +1127,7 @@ var gen = (suffix, blockLen, outputLen) => createHasher(() => new Keccak(blockLe
 var keccak_256;
 var init_sha3 = __esm(() => {
   init__u64();
-  init_utils();
+  init_utils2();
   _0n = BigInt(0);
   _1n = BigInt(1);
   _2n = BigInt(2);
@@ -817,87 +1276,10 @@ var init_keccak256 = __esm(() => {
   init_toBytes();
   init_toHex();
 });
-function hashSignature(sig) {
-  return hash(sig);
-}
-var hash = (value2) => keccak256(toBytes(value2));
-var init_hashSignature = __esm(() => {
-  init_toBytes();
-  init_keccak256();
-});
-function normalizeSignature(signature) {
-  let active = true;
-  let current = "";
-  let level = 0;
-  let result = "";
-  let valid = false;
-  for (let i2 = 0;i2 < signature.length; i2++) {
-    const char = signature[i2];
-    if (["(", ")", ","].includes(char))
-      active = true;
-    if (char === "(")
-      level++;
-    if (char === ")")
-      level--;
-    if (!active)
-      continue;
-    if (level === 0) {
-      if (char === " " && ["event", "function", ""].includes(result))
-        result = "";
-      else {
-        result += char;
-        if (char === ")") {
-          valid = true;
-          break;
-        }
-      }
-      continue;
-    }
-    if (char === " ") {
-      if (signature[i2 - 1] !== "," && current !== "," && current !== ",(") {
-        current = "";
-        active = false;
-      }
-      continue;
-    }
-    result += char;
-    current += char;
-  }
-  if (!valid)
-    throw new BaseError("Unable to normalize signature.");
-  return result;
-}
-var init_normalizeSignature = __esm(() => {
-  init_base();
-});
-var toSignature = (def) => {
-  const def_ = (() => {
-    if (typeof def === "string")
-      return def;
-    return formatAbiItem(def);
-  })();
-  return normalizeSignature(def_);
-};
-var init_toSignature = __esm(() => {
-  init_exports();
-  init_normalizeSignature();
-});
-function toSignatureHash(fn) {
-  return hashSignature(toSignature(fn));
-}
-var init_toSignatureHash = __esm(() => {
-  init_hashSignature();
-  init_toSignature();
-});
-var toEventSelector;
-var init_toEventSelector = __esm(() => {
-  init_toSignatureHash();
-  toEventSelector = toSignatureHash;
-});
 var InvalidAddressError;
 var init_address = __esm(() => {
   init_base();
-  InvalidAddressError = class InvalidAddressError2 extends BaseError {
+  InvalidAddressError = class InvalidAddressError2 extends BaseError2 {
     constructor({ address }) {
       super(`Address "${address}" is invalid.`, {
         metaMessages: [
@@ -945,13 +1327,13 @@ function checksumAddress(address_, chainId) {
   if (checksumAddressCache.has(`${address_}.${chainId}`))
     return checksumAddressCache.get(`${address_}.${chainId}`);
   const hexAddress = chainId ? `${chainId}${address_.toLowerCase()}` : address_.substring(2).toLowerCase();
-  const hash2 = keccak256(stringToBytes(hexAddress), "bytes");
+  const hash = keccak256(stringToBytes(hexAddress), "bytes");
   const address = (chainId ? hexAddress.substring(`${chainId}0x`.length) : hexAddress).split("");
   for (let i2 = 0;i2 < 40; i2 += 2) {
-    if (hash2[i2 >> 1] >> 4 >= 8 && address[i2]) {
+    if (hash[i2 >> 1] >> 4 >= 8 && address[i2]) {
       address[i2] = address[i2].toUpperCase();
     }
-    if ((hash2[i2 >> 1] & 15) >= 8 && address[i2 + 1]) {
+    if ((hash[i2 >> 1] & 15) >= 8 && address[i2 + 1]) {
       address[i2 + 1] = address[i2 + 1].toUpperCase();
     }
   }
@@ -1056,9 +1438,9 @@ var init_slice = __esm(() => {
   init_data();
   init_size();
 });
-var integerRegex;
+var integerRegex2;
 var init_regex2 = __esm(() => {
-  integerRegex = /^(u?int)(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)?$/;
+  integerRegex2 = /^(u?int)(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)?$/;
 });
 function encodeAbiParameters(params, values) {
   if (params.length !== values.length)
@@ -1101,7 +1483,7 @@ function prepareParam({ param, value: value2 }) {
   }
   if (param.type.startsWith("uint") || param.type.startsWith("int")) {
     const signed = param.type.startsWith("int");
-    const [, , size2 = "256"] = integerRegex.exec(param.type) ?? [];
+    const [, , size2 = "256"] = integerRegex2.exec(param.type) ?? [];
     return encodeNumber(value2, {
       signed,
       size: Number(size2)
@@ -1205,7 +1587,7 @@ function encodeBytes(value2, { param }) {
 }
 function encodeBool(value2) {
   if (typeof value2 !== "boolean")
-    throw new BaseError(`Invalid boolean value: "${value2}" (type: ${typeof value2}). Expected: \`true\` or \`false\`.`);
+    throw new BaseError2(`Invalid boolean value: "${value2}" (type: ${typeof value2}). Expected: \`true\` or \`false\`.`);
   return { dynamic: false, encoded: padHex(boolToHex(value2)) };
 }
 function encodeNumber(value2, { signed, size: size2 = 256 }) {
@@ -1280,169 +1662,6 @@ var init_encodeAbiParameters = __esm(() => {
   init_slice();
   init_toHex();
   init_regex2();
-});
-var toFunctionSelector = (fn) => slice(toSignatureHash(fn), 0, 4);
-var init_toFunctionSelector = __esm(() => {
-  init_slice();
-  init_toSignatureHash();
-});
-function getAbiItem(parameters) {
-  const { abi, args = [], name } = parameters;
-  const isSelector = isHex(name, { strict: false });
-  const abiItems = abi.filter((abiItem) => {
-    if (isSelector) {
-      if (abiItem.type === "function")
-        return toFunctionSelector(abiItem) === name;
-      if (abiItem.type === "event")
-        return toEventSelector(abiItem) === name;
-      return false;
-    }
-    return "name" in abiItem && abiItem.name === name;
-  });
-  if (abiItems.length === 0)
-    return;
-  if (abiItems.length === 1)
-    return abiItems[0];
-  let matchedAbiItem = undefined;
-  for (const abiItem of abiItems) {
-    if (!("inputs" in abiItem))
-      continue;
-    if (!args || args.length === 0) {
-      if (!abiItem.inputs || abiItem.inputs.length === 0)
-        return abiItem;
-      continue;
-    }
-    if (!abiItem.inputs)
-      continue;
-    if (abiItem.inputs.length === 0)
-      continue;
-    if (abiItem.inputs.length !== args.length)
-      continue;
-    const matched = args.every((arg, index) => {
-      const abiParameter = "inputs" in abiItem && abiItem.inputs[index];
-      if (!abiParameter)
-        return false;
-      return isArgOfType(arg, abiParameter);
-    });
-    if (matched) {
-      if (matchedAbiItem && "inputs" in matchedAbiItem && matchedAbiItem.inputs) {
-        const ambiguousTypes = getAmbiguousTypes(abiItem.inputs, matchedAbiItem.inputs, args);
-        if (ambiguousTypes)
-          throw new AbiItemAmbiguityError({
-            abiItem,
-            type: ambiguousTypes[0]
-          }, {
-            abiItem: matchedAbiItem,
-            type: ambiguousTypes[1]
-          });
-      }
-      matchedAbiItem = abiItem;
-    }
-  }
-  if (matchedAbiItem)
-    return matchedAbiItem;
-  return abiItems[0];
-}
-function isArgOfType(arg, abiParameter) {
-  const argType = typeof arg;
-  const abiParameterType = abiParameter.type;
-  switch (abiParameterType) {
-    case "address":
-      return isAddress(arg, { strict: false });
-    case "bool":
-      return argType === "boolean";
-    case "function":
-      return argType === "string";
-    case "string":
-      return argType === "string";
-    default: {
-      if (abiParameterType === "tuple" && "components" in abiParameter)
-        return Object.values(abiParameter.components).every((component, index) => {
-          return isArgOfType(Object.values(arg)[index], component);
-        });
-      if (/^u?int(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)?$/.test(abiParameterType))
-        return argType === "number" || argType === "bigint";
-      if (/^bytes([1-9]|1[0-9]|2[0-9]|3[0-2])?$/.test(abiParameterType))
-        return argType === "string" || arg instanceof Uint8Array;
-      if (/[a-z]+[1-9]{0,3}(\[[0-9]{0,}\])+$/.test(abiParameterType)) {
-        return Array.isArray(arg) && arg.every((x) => isArgOfType(x, {
-          ...abiParameter,
-          type: abiParameterType.replace(/(\[[0-9]{0,}\])$/, "")
-        }));
-      }
-      return false;
-    }
-  }
-}
-function getAmbiguousTypes(sourceParameters, targetParameters, args) {
-  for (const parameterIndex in sourceParameters) {
-    const sourceParameter = sourceParameters[parameterIndex];
-    const targetParameter = targetParameters[parameterIndex];
-    if (sourceParameter.type === "tuple" && targetParameter.type === "tuple" && "components" in sourceParameter && "components" in targetParameter)
-      return getAmbiguousTypes(sourceParameter.components, targetParameter.components, args[parameterIndex]);
-    const types4 = [sourceParameter.type, targetParameter.type];
-    const ambiguous = (() => {
-      if (types4.includes("address") && types4.includes("bytes20"))
-        return true;
-      if (types4.includes("address") && types4.includes("string"))
-        return isAddress(args[parameterIndex], { strict: false });
-      if (types4.includes("address") && types4.includes("bytes"))
-        return isAddress(args[parameterIndex], { strict: false });
-      return false;
-    })();
-    if (ambiguous)
-      return types4;
-  }
-  return;
-}
-var init_getAbiItem = __esm(() => {
-  init_abi();
-  init_isAddress();
-  init_toEventSelector();
-  init_toFunctionSelector();
-});
-function prepareEncodeFunctionData(parameters) {
-  const { abi, args, functionName } = parameters;
-  let abiItem = abi[0];
-  if (functionName) {
-    const item = getAbiItem({
-      abi,
-      args,
-      name: functionName
-    });
-    if (!item)
-      throw new AbiFunctionNotFoundError(functionName, { docsPath });
-    abiItem = item;
-  }
-  if (abiItem.type !== "function")
-    throw new AbiFunctionNotFoundError(undefined, { docsPath });
-  return {
-    abi: [abiItem],
-    functionName: toFunctionSelector(formatAbiItem2(abiItem))
-  };
-}
-var docsPath = "/docs/contract/encodeFunctionData";
-var init_prepareEncodeFunctionData = __esm(() => {
-  init_abi();
-  init_toFunctionSelector();
-  init_formatAbiItem2();
-  init_getAbiItem();
-});
-function encodeFunctionData(parameters) {
-  const { args } = parameters;
-  const { abi, functionName } = (() => {
-    if (parameters.abi.length === 1 && parameters.functionName?.startsWith("0x"))
-      return parameters;
-    return prepareEncodeFunctionData(parameters);
-  })();
-  const abiItem = abi[0];
-  const signature = functionName;
-  const data = "inputs" in abiItem && abiItem.inputs ? encodeAbiParameters(abiItem.inputs, args ?? []) : undefined;
-  return concatHex([signature, data ?? "0x"]);
-}
-var init_encodeFunctionData = __esm(() => {
-  init_encodeAbiParameters();
-  init_prepareEncodeFunctionData();
 });
 function isMessage(arg, schema) {
   const isMessage2 = arg !== null && typeof arg == "object" && "$typeName" in arg && typeof arg.$typeName == "string";
@@ -11994,11 +12213,11 @@ function datetimeRegex(args) {
   regex = `${regex}(${opts.join("|")})`;
   return new RegExp(`^${regex}$`);
 }
-function isValidIP(ip, version2) {
-  if ((version2 === "v4" || !version2) && ipv4Regex.test(ip)) {
+function isValidIP(ip, version3) {
+  if ((version3 === "v4" || !version3) && ipv4Regex.test(ip)) {
     return true;
   }
-  if ((version2 === "v6" || !version2) && ipv6Regex.test(ip)) {
+  if ((version3 === "v6" || !version3) && ipv6Regex.test(ip)) {
     return true;
   }
   return false;
@@ -12025,11 +12244,11 @@ function isValidJWT(jwt, alg) {
     return false;
   }
 }
-function isValidCidr(ip, version2) {
-  if ((version2 === "v4" || !version2) && ipv4CidrRegex.test(ip)) {
+function isValidCidr(ip, version3) {
+  if ((version3 === "v4" || !version3) && ipv4CidrRegex.test(ip)) {
     return true;
   }
-  if ((version2 === "v6" || !version2) && ipv6CidrRegex.test(ip)) {
+  if ((version3 === "v6" || !version3) && ipv6CidrRegex.test(ip)) {
     return true;
   }
   return false;
@@ -15550,23 +15769,13 @@ var sendErrorResponse = (error) => {
   }
   hostBindings.sendResponse(payload);
 };
-init_encodeFunctionData();
+init_exports();
+init_encodeAbiParameters();
 init_toBytes();
 init_keccak256();
-var LoanRegistry_default = {
-  abi: [{ type: "constructor", inputs: [{ name: "authorizedWorkflow", type: "address", internalType: "address" }], stateMutability: "nonpayable" }, { type: "function", name: "DEFAULT_ADMIN_ROLE", inputs: [], outputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], stateMutability: "view" }, { type: "function", name: "WORKFLOW_ROLE", inputs: [], outputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], stateMutability: "view" }, { type: "function", name: "deactivateCovenant", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "covenantName", type: "string", internalType: "string" }], outputs: [], stateMutability: "nonpayable" }, { type: "function", name: "getCovenant", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "covenantName", type: "string", internalType: "string" }], outputs: [{ name: "name", type: "string", internalType: "string" }, { name: "metricDefinition", type: "string", internalType: "string" }, { name: "threshold", type: "uint256", internalType: "uint256" }, { name: "thresholdType", type: "string", internalType: "string" }, { name: "ebitdaAdjustments", type: "string", internalType: "string" }, { name: "isActive", type: "bool", internalType: "bool" }], stateMutability: "view" }, { type: "function", name: "getCovenantNames", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "string[]", internalType: "string[]" }], stateMutability: "view" }, { type: "function", name: "getLoanSchema", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "tokenAddress", type: "address", internalType: "address" }, { name: "principalAmount", type: "uint256", internalType: "uint256" }, { name: "onboardingTimestamp", type: "uint256", internalType: "uint256" }, { name: "reportingFrequency", type: "uint256", internalType: "uint256" }, { name: "covenantNames", type: "string[]", internalType: "string[]" }], stateMutability: "view" }, { type: "function", name: "getRegisteredLoanCount", inputs: [], outputs: [{ name: "", type: "uint256", internalType: "uint256" }], stateMutability: "view" }, { type: "function", name: "getRoleAdmin", inputs: [{ name: "role", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], stateMutability: "view" }, { type: "function", name: "grantRole", inputs: [{ name: "role", type: "bytes32", internalType: "bytes32" }, { name: "account", type: "address", internalType: "address" }], outputs: [], stateMutability: "nonpayable" }, { type: "function", name: "hasRole", inputs: [{ name: "role", type: "bytes32", internalType: "bytes32" }, { name: "account", type: "address", internalType: "address" }], outputs: [{ name: "", type: "bool", internalType: "bool" }], stateMutability: "view" }, { type: "function", name: "isLoanRegistered", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "bool", internalType: "bool" }], stateMutability: "view" }, { type: "function", name: "registerLoan", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "tokenAddress", type: "address", internalType: "address" }, { name: "principalAmount", type: "uint256", internalType: "uint256" }, { name: "reportingFrequency", type: "uint256", internalType: "uint256" }, { name: "covenantNames", type: "string[]", internalType: "string[]" }, { name: "metricDefinitions", type: "string[]", internalType: "string[]" }, { name: "thresholds", type: "uint256[]", internalType: "uint256[]" }, { name: "thresholdTypes", type: "string[]", internalType: "string[]" }, { name: "ebitdaAdjustments", type: "string[]", internalType: "string[]" }], outputs: [], stateMutability: "nonpayable" }, { type: "function", name: "registeredLoans", inputs: [{ name: "", type: "uint256", internalType: "uint256" }], outputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], stateMutability: "view" }, { type: "function", name: "renounceRole", inputs: [{ name: "role", type: "bytes32", internalType: "bytes32" }, { name: "callerConfirmation", type: "address", internalType: "address" }], outputs: [], stateMutability: "nonpayable" }, { type: "function", name: "revokeRole", inputs: [{ name: "role", type: "bytes32", internalType: "bytes32" }, { name: "account", type: "address", internalType: "address" }], outputs: [], stateMutability: "nonpayable" }, { type: "function", name: "supportsInterface", inputs: [{ name: "interfaceId", type: "bytes4", internalType: "bytes4" }], outputs: [{ name: "", type: "bool", internalType: "bool" }], stateMutability: "view" }, { type: "function", name: "updateCovenantThreshold", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "covenantName", type: "string", internalType: "string" }, { name: "newThreshold", type: "uint256", internalType: "uint256" }], outputs: [], stateMutability: "nonpayable" }, { type: "event", name: "CovenantAdded", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "covenantName", type: "string", indexed: false, internalType: "string" }, { name: "threshold", type: "uint256", indexed: false, internalType: "uint256" }, { name: "thresholdType", type: "string", indexed: false, internalType: "string" }], anonymous: false }, { type: "event", name: "CovenantDeactivated", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "covenantName", type: "string", indexed: false, internalType: "string" }], anonymous: false }, { type: "event", name: "CovenantUpdated", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "covenantName", type: "string", indexed: false, internalType: "string" }, { name: "newThreshold", type: "uint256", indexed: false, internalType: "uint256" }], anonymous: false }, { type: "event", name: "LoanRegistered", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "tokenAddress", type: "address", indexed: true, internalType: "address" }, { name: "principalAmount", type: "uint256", indexed: false, internalType: "uint256" }, { name: "covenantCount", type: "uint256", indexed: false, internalType: "uint256" }, { name: "timestamp", type: "uint256", indexed: false, internalType: "uint256" }], anonymous: false }, { type: "event", name: "RoleAdminChanged", inputs: [{ name: "role", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "previousAdminRole", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "newAdminRole", type: "bytes32", indexed: true, internalType: "bytes32" }], anonymous: false }, { type: "event", name: "RoleGranted", inputs: [{ name: "role", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "account", type: "address", indexed: true, internalType: "address" }, { name: "sender", type: "address", indexed: true, internalType: "address" }], anonymous: false }, { type: "event", name: "RoleRevoked", inputs: [{ name: "role", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "account", type: "address", indexed: true, internalType: "address" }, { name: "sender", type: "address", indexed: true, internalType: "address" }], anonymous: false }, { type: "error", name: "AccessControlBadConfirmation", inputs: [] }, { type: "error", name: "AccessControlUnauthorizedAccount", inputs: [{ name: "account", type: "address", internalType: "address" }, { name: "neededRole", type: "bytes32", internalType: "bytes32" }] }, { type: "error", name: "ConvenantNotFound", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "covenantName", type: "string", internalType: "string" }] }, { type: "error", name: "InvalidCovenantArray", inputs: [] }, { type: "error", name: "InvalidTokenAddress", inputs: [] }, { type: "error", name: "LoanAlreadyRegistered", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }] }, { type: "error", name: "LoanNotRegistered", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }] }],
-  bytecode: { object: "0x60803461007257601f61173938819003918201601f19168301916001600160401b038311848410176100765780849260209460405283398101031261007257516001600160a01b0381168103610072576100629061005c3361008a565b50610100565b5060405161154590816101948239f35b5f80fd5b634e487b7160e01b5f52604160045260245ffd5b6001600160a01b0381165f9081525f5160206117195f395f51905f52602052604090205460ff166100fb576001600160a01b03165f8181525f5160206117195f395f51905f5260205260408120805460ff191660011790553391905f5160206116d95f395f51905f528180a4600190565b505f90565b6001600160a01b0381165f9081525f5160206116f95f395f51905f52602052604090205460ff166100fb576001600160a01b03165f8181525f5160206116f95f395f51905f5260205260408120805460ff191660011790553391907f27474d19bed8c237b6f0ac3a8e704c5f2dc7c7f0e86a42e967d95cfc461c1d22905f5160206116d95f395f51905f529080a460019056fe6101c06040526004361015610012575f80fd5b5f3560e01c80630137f49314610ec057806301ffc9a714610e6a578063248a9ca314610e385780632f2ff15d14610dfb57806336568abe14610db75780633ab6613a1461055857806351d274de1461050a57806389f75e8a146104d25780638aa1fef7146104205780638bb7e473146104035780638ef5c48d146102cb57806391d148541461028357806393de0af914610249578063a217fddf1461022f578063bc09792f146101fd578063c3d8b3401461011d5763d547741f146100d5575f80fd5b34610119576040366003190112610119576101176004356100f4610fba565b9061011261010d825f525f602052600160405f20015490565b6113cf565b61148f565b005b5f80fd5b34610119576060366003190112610119576004356024356001600160401b03811161011957610150903690600401611018565b91906044359261015e611360565b61016783611333565b825f526001602052610180600660405f200182846112e0565b9361018b85546110b4565b156101da578060027f2c0c38f77f6e07d8cdab906f404dbca1bf502456d9730e24e48004198a776e71959601556101cf6040519384936040855260408501916112f9565b9060208301520390a2005b5060405163b93204b760e01b81529182916101f9918560048501611319565b0390fd5b34610119576020366003190112610119576004355f526001602052602060ff600760405f200154166040519015158152f35b34610119575f3660031901126101195760206040515f8152f35b34610119575f3660031901126101195760206040517f27474d19bed8c237b6f0ac3a8e704c5f2dc7c7f0e86a42e967d95cfc461c1d228152f35b346101195760403660031901126101195761029c610fba565b6004355f525f60205260405f209060018060a01b03165f52602052602060ff60405f2054166040519015158152f35b34610119576102d936611045565b91906102e482611333565b815f5260016020526102fd600660405f200184836112e0565b916040519261030b84611078565b610314816110ec565b8452610322600182016110ec565b936020810194855260028201549360408201948552610343600384016110ec565b936060830194855260ff600561035b600487016110ec565b95608086019687520154169760a084019815158952835151156103e6575050506103dc926103ad96926103bb6103ce935197519651925191519451151596604051998a9960c08b5260c08b0190610f3e565b9089820360208b0152610f3e565b9160408801528682036060880152610f3e565b908482036080860152610f3e565b9060a08301520390f35b6101f99060405193849363b93204b760e01b855260048501611319565b34610119575f366003190112610119576020600254604051908152f35b346101195761042e36611045565b9190610438611360565b61044182611333565b815f52600160205261045a600660405f200184836112e0565b9261046584546110b4565b156104b45760057f277d87b869727f9eaea1381ffc63a3674cba7eef4e2009d7d4b95c4b6ffb3b2193940160ff1981541690556104af6040519283926020845260208401916112f9565b0390a2005b60405163b93204b760e01b81529182916101f9918560048501611319565b3461011957602036600319011261011957600435600254811015610119576104fb602091611000565b90549060031b1c604051908152f35b346101195760203660031901126101195760043561052781611333565b5f526001602052610554610540600560405f200161118c565b604051918291602083526020830190610f62565b0390f35b346101195761012036600319011261011957610572610fba565b610180526084356001600160401b03811161011957610595903690600401610fd0565b6101a05260c05260a4356001600160401b038111610119576105bb903690600401610fd0565b60a0526101405260c4356001600160401b038111610119576105e1903690600401610fd0565b610100526101605260e4356001600160401b03811161011957610608903690600401610fd0565b60e05261012052610104356001600160401b0381116101195761062f903690600401610fd0565b60805261063a611360565b6004355f52600160205260ff600760405f20015416610da257610180516001600160a01b031615610d93576101a05115610d565760a0516101a05114801590610d83575b8015610d74575b8015610d65575b610d56576004355f52600160205260405f209060043582556001820160018060a01b0361018051166bffffffffffffffffffffffff60a01b8254161790556044356002830155426003830155606435600483015560078201600160ff198254161790555f915b6101a051831061079357600254600160401b81101561077f5780600161071b9201600255611000565b81549060031b90600435821b915f19901b191617905560405160443581526101a051602082015242604082015260018060a01b036101805116907f25bee5063b2a922264e207d82efab5ad6b05550795e0f26ba6fe05cd7077543b606060043592a3005b634e487b7160e01b5f52604160045260245ffd5b6107a3836101a05160c0516111ec565b6005830154600160401b81101561077f576001810160058501819055811015610d4257600584015f5260205f2001916001600160401b03821161077f576107f4826107ee85546110b4565b8561122d565b5f90601f8311600114610cdc5761082292915f9183610cd1575b50508160011b915f199060031b1c19161790565b90555b826108ce6108a96108a061083f846101a05160c0516111ec565b93906108bf886108558860a051610140516111ec565b96906108688a610100516101605161128b565b359761088961087d8c60e051610120516111ec565b9f9095608051906111ec565b9890966040519b6108998d611078565b369161129b565b8a52369161129b565b9a602088019b8c5260408801968752369161129b565b9260608601938452369161129b565b9160808401928352600160a08501526108fa6108f0866101a05160c0516111ec565b60068901916112e0565b9784518051906001600160401b03821161077f576109228261091c8d546110b4565b8d61122d565b602090601f8311600114610c6e5761095092915f9183610c005750508160011b915f199060031b1c19161790565b89555b51805160018a01916001600160401b03821161077f57610977826107ee85546110b4565b602090601f8311600114610c0b576109a592915f9183610c005750508160011b915f199060031b1c19161790565b90555b51600288015551805160038801916001600160401b03821161077f576109d2826107ee85546110b4565b602090601f8311600114610b9d57610a0092915f9183610b925750508160011b915f199060031b1c19161790565b90555b519485516001600160401b03811161077f57610a2f81610a2660048501546110b4565b6004850161122d565b602096601f8211600114610b1f5791610a6782600593600198999a60a0965f92610b145750508160011b915f199060031b1c19161790565b60048201555b01910151151560ff801983541691161790557fe179c7aea0ef47bb61c5502f5a87afaa640dd4f4c97d6e1be84fa1c7e97fa984610ab0826101a05160c0516111ec565b9190610ac384610100516101605161128b565b3592610b09610ad88660e051610120516111ec565b610af26040979297519586956060875260608701916112f9565b9160208501528382036040850152600435966112f9565b0390a20191906106f2565b015190508b8061080e565b96600483015f52805f20975f5b601f1984168110610b7a575082600197989960a095938993600596601f19811610610b62575b505050811b016004820155610a6d565b01515f1960f88460031b161c191690558a8080610b52565b818301518a5560019099019860209283019201610b2c565b015190508a8061080e565b90601f19831691845f52815f20925f5b818110610be85750908460019594939210610bd0575b505050811b019055610a03565b01515f1960f88460031b161c19169055898080610bc3565b92936020600181928786015181550195019301610bad565b015190508c8061080e565b90601f19831691845f52815f20925f5b818110610c565750908460019594939210610c3e575b505050811b0190556109a8565b01515f1960f88460031b161c191690558b8080610c31565b92936020600181928786015181550195019301610c1b565b90601f198316918c5f52815f20925f5b818110610cb95750908460019594939210610ca1575b505050811b018955610953565b01515f1960f88460031b161c191690558b8080610c94565b92936020600181928786015181550195019301610c7e565b01359050878061080e565b835f5260205f20915f5b601f1985168110610d2a575090839291600194601f19811610610d11575b505050811b019055610825565b01355f19600384901b60f8161c19169055868080610d04565b82820135845560019093019260209182019101610ce6565b634e487b7160e01b5f52603260045260245ffd5b630ffa118160e01b5f5260045ffd5b506080516101a051141561068c565b5060e0516101a0511415610685565b50610100516101a051141561067e565b630f58058360e11b5f5260045ffd5b63c343b2ef60e01b5f5260043560045260245ffd5b3461011957604036600319011261011957610dd0610fba565b336001600160a01b03821603610dec576101179060043561148f565b63334bd91960e11b5f5260045ffd5b3461011957604036600319011261011957610117600435610e1a610fba565b90610e3361010d825f525f602052600160405f20015490565b611407565b34610119576020366003190112610119576020610e626004355f525f602052600160405f20015490565b604051908152f35b346101195760203660031901126101195760043563ffffffff60e01b811680910361011957602090637965db0b60e01b8114908115610eaf575b506040519015158152f35b6301ffc9a760e01b14905082610ea4565b3461011957602036600319011261011957600435610edd81611333565b5f52600160205260405f2060018060a01b03600182015416610554600283015492600381015490610f1560056004830154920161118c565b91604051958695865260208601526040850152606084015260a0608084015260a0830190610f62565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b9080602083519182815201916020808360051b8301019401925f915b838310610f8d57505050505090565b9091929394602080610fab600193601f198682030187528951610f3e565b97019301930191939290610f7e565b602435906001600160a01b038216820361011957565b9181601f84011215610119578235916001600160401b038311610119576020808501948460051b01011161011957565b600254811015610d425760025f5260205f2001905f90565b9181601f84011215610119578235916001600160401b038311610119576020838186019501011161011957565b9060406003198301126101195760043591602435906001600160401b0382116101195761107491600401611018565b9091565b60c081019081106001600160401b0382111761077f57604052565b90601f801991011681019081106001600160401b0382111761077f57604052565b90600182811c921680156110e2575b60208310146110ce57565b634e487b7160e01b5f52602260045260245ffd5b91607f16916110c3565b9060405191825f8254926110ff846110b4565b808452936001811690811561116a5750600114611126575b5061112492500383611093565b565b90505f9291925260205f20905f915b81831061114e575050906020611124928201015f611117565b6020919350806001915483858901015201910190918492611135565b90506020925061112494915060ff191682840152151560051b8201015f611117565b9081546001600160401b03811161077f57604051926111b160208360051b0185611093565b81845260208401905f5260205f205f915b8383106111cf5750505050565b6001602081926111de856110ec565b8152019201920191906111c2565b9190811015610d425760051b81013590601e19813603018212156101195701908135916001600160401b038311610119576020018236038113610119579190565b919091601f831161123e575b505050565b81831161124a57505050565b5f5260205f206020601f830160051c9210611283575b81601f9101920160051c03905f5b82811015611239575f8282015560010161126e565b5f9150611260565b9190811015610d425760051b0190565b9291926001600160401b03821161077f57604051916112c4601f8201601f191660200184611093565b829481845281830111610119578281602093845f960137010152565b6020919283604051948593843782019081520301902090565b908060209392818452848401375f828201840152601f01601f1916010190565b6040906113309492815281602082015201916112f9565b90565b805f52600160205260ff600760405f200154161561134e5750565b634607cd3160e11b5f5260045260245ffd5b335f9081527f88b5e9d578fd2c8ef697d9eaf521eed09df8abdd2177a8b24330be81f4cea85e602052604090205460ff161561139857565b63e2517d3f60e01b5f52336004527f27474d19bed8c237b6f0ac3a8e704c5f2dc7c7f0e86a42e967d95cfc461c1d2260245260445ffd5b5f8181526020818152604080832033845290915290205460ff16156113f15750565b63e2517d3f60e01b5f523360045260245260445ffd5b5f818152602081815260408083206001600160a01b038616845290915290205460ff16611489575f818152602081815260408083206001600160a01b0395909516808452949091528120805460ff19166001179055339291907f2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d9080a4600190565b50505f90565b5f818152602081815260408083206001600160a01b038616845290915290205460ff1615611489575f818152602081815260408083206001600160a01b0395909516808452949091528120805460ff19169055339291907ff6391f5c32d9c69d2a47ea670b442974b53935d1edc7fd64eb21e047a839171b9080a460019056fea26469706673582212201de6d3f94a4df7977cb70905ab81a056d2642e807d21b14842ab8da4444ae87264736f6c634300082100332f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d88b5e9d578fd2c8ef697d9eaf521eed09df8abdd2177a8b24330be81f4cea85ead3228b676f7d3cd4284a5443f17f1962b36e491b30a40b2405849e597ba5fb5", sourceMap: "146:8694:23:-:0;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;2482:45;2461:10;2430:42;2461:10;2430:42;:::i;:::-;;2482:45;:::i;:::-;;146:8694;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;-1:-1:-1;146:8694:23;;;;;-1:-1:-1;146:8694:23;6155:316:15;-1:-1:-1;;;;;146:8694:23;;2241:4:15;146:8694:23;;;-1:-1:-1;;;;;;;;;;;146:8694:23;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;2241:4:15;146:8694:23;;;-1:-1:-1;;;;;;;;;;;146:8694:23;;;;;;;-1:-1:-1;;146:8694:23;;;;;735:10:17;;146:8694:23;-1:-1:-1;;;;;;;;;;;2241:4:15;;6346:40;6323:4;6400:11;:::o;6248:217::-;6442:12;2241:4;6442:12;:::o;6155:316::-;-1:-1:-1;;;;;146:8694:23;;;;;;-1:-1:-1;;;;;;;;;;;146:8694:23;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;-1:-1:-1;;;;;;;;;;;146:8694:23;;;;;;;-1:-1:-1;;146:8694:23;;;;;735:10:17;;146:8694:23;1357:26;;-1:-1:-1;;;;;;;;;;;6346:40:15;146:8694:23;6346:40:15;6323:4;6400:11;:::o", linkReferences: {} },
-  deployedBytecode: { object: "0x6101c06040526004361015610012575f80fd5b5f3560e01c80630137f49314610ec057806301ffc9a714610e6a578063248a9ca314610e385780632f2ff15d14610dfb57806336568abe14610db75780633ab6613a1461055857806351d274de1461050a57806389f75e8a146104d25780638aa1fef7146104205780638bb7e473146104035780638ef5c48d146102cb57806391d148541461028357806393de0af914610249578063a217fddf1461022f578063bc09792f146101fd578063c3d8b3401461011d5763d547741f146100d5575f80fd5b34610119576040366003190112610119576101176004356100f4610fba565b9061011261010d825f525f602052600160405f20015490565b6113cf565b61148f565b005b5f80fd5b34610119576060366003190112610119576004356024356001600160401b03811161011957610150903690600401611018565b91906044359261015e611360565b61016783611333565b825f526001602052610180600660405f200182846112e0565b9361018b85546110b4565b156101da578060027f2c0c38f77f6e07d8cdab906f404dbca1bf502456d9730e24e48004198a776e71959601556101cf6040519384936040855260408501916112f9565b9060208301520390a2005b5060405163b93204b760e01b81529182916101f9918560048501611319565b0390fd5b34610119576020366003190112610119576004355f526001602052602060ff600760405f200154166040519015158152f35b34610119575f3660031901126101195760206040515f8152f35b34610119575f3660031901126101195760206040517f27474d19bed8c237b6f0ac3a8e704c5f2dc7c7f0e86a42e967d95cfc461c1d228152f35b346101195760403660031901126101195761029c610fba565b6004355f525f60205260405f209060018060a01b03165f52602052602060ff60405f2054166040519015158152f35b34610119576102d936611045565b91906102e482611333565b815f5260016020526102fd600660405f200184836112e0565b916040519261030b84611078565b610314816110ec565b8452610322600182016110ec565b936020810194855260028201549360408201948552610343600384016110ec565b936060830194855260ff600561035b600487016110ec565b95608086019687520154169760a084019815158952835151156103e6575050506103dc926103ad96926103bb6103ce935197519651925191519451151596604051998a9960c08b5260c08b0190610f3e565b9089820360208b0152610f3e565b9160408801528682036060880152610f3e565b908482036080860152610f3e565b9060a08301520390f35b6101f99060405193849363b93204b760e01b855260048501611319565b34610119575f366003190112610119576020600254604051908152f35b346101195761042e36611045565b9190610438611360565b61044182611333565b815f52600160205261045a600660405f200184836112e0565b9261046584546110b4565b156104b45760057f277d87b869727f9eaea1381ffc63a3674cba7eef4e2009d7d4b95c4b6ffb3b2193940160ff1981541690556104af6040519283926020845260208401916112f9565b0390a2005b60405163b93204b760e01b81529182916101f9918560048501611319565b3461011957602036600319011261011957600435600254811015610119576104fb602091611000565b90549060031b1c604051908152f35b346101195760203660031901126101195760043561052781611333565b5f526001602052610554610540600560405f200161118c565b604051918291602083526020830190610f62565b0390f35b346101195761012036600319011261011957610572610fba565b610180526084356001600160401b03811161011957610595903690600401610fd0565b6101a05260c05260a4356001600160401b038111610119576105bb903690600401610fd0565b60a0526101405260c4356001600160401b038111610119576105e1903690600401610fd0565b610100526101605260e4356001600160401b03811161011957610608903690600401610fd0565b60e05261012052610104356001600160401b0381116101195761062f903690600401610fd0565b60805261063a611360565b6004355f52600160205260ff600760405f20015416610da257610180516001600160a01b031615610d93576101a05115610d565760a0516101a05114801590610d83575b8015610d74575b8015610d65575b610d56576004355f52600160205260405f209060043582556001820160018060a01b0361018051166bffffffffffffffffffffffff60a01b8254161790556044356002830155426003830155606435600483015560078201600160ff198254161790555f915b6101a051831061079357600254600160401b81101561077f5780600161071b9201600255611000565b81549060031b90600435821b915f19901b191617905560405160443581526101a051602082015242604082015260018060a01b036101805116907f25bee5063b2a922264e207d82efab5ad6b05550795e0f26ba6fe05cd7077543b606060043592a3005b634e487b7160e01b5f52604160045260245ffd5b6107a3836101a05160c0516111ec565b6005830154600160401b81101561077f576001810160058501819055811015610d4257600584015f5260205f2001916001600160401b03821161077f576107f4826107ee85546110b4565b8561122d565b5f90601f8311600114610cdc5761082292915f9183610cd1575b50508160011b915f199060031b1c19161790565b90555b826108ce6108a96108a061083f846101a05160c0516111ec565b93906108bf886108558860a051610140516111ec565b96906108688a610100516101605161128b565b359761088961087d8c60e051610120516111ec565b9f9095608051906111ec565b9890966040519b6108998d611078565b369161129b565b8a52369161129b565b9a602088019b8c5260408801968752369161129b565b9260608601938452369161129b565b9160808401928352600160a08501526108fa6108f0866101a05160c0516111ec565b60068901916112e0565b9784518051906001600160401b03821161077f576109228261091c8d546110b4565b8d61122d565b602090601f8311600114610c6e5761095092915f9183610c005750508160011b915f199060031b1c19161790565b89555b51805160018a01916001600160401b03821161077f57610977826107ee85546110b4565b602090601f8311600114610c0b576109a592915f9183610c005750508160011b915f199060031b1c19161790565b90555b51600288015551805160038801916001600160401b03821161077f576109d2826107ee85546110b4565b602090601f8311600114610b9d57610a0092915f9183610b925750508160011b915f199060031b1c19161790565b90555b519485516001600160401b03811161077f57610a2f81610a2660048501546110b4565b6004850161122d565b602096601f8211600114610b1f5791610a6782600593600198999a60a0965f92610b145750508160011b915f199060031b1c19161790565b60048201555b01910151151560ff801983541691161790557fe179c7aea0ef47bb61c5502f5a87afaa640dd4f4c97d6e1be84fa1c7e97fa984610ab0826101a05160c0516111ec565b9190610ac384610100516101605161128b565b3592610b09610ad88660e051610120516111ec565b610af26040979297519586956060875260608701916112f9565b9160208501528382036040850152600435966112f9565b0390a20191906106f2565b015190508b8061080e565b96600483015f52805f20975f5b601f1984168110610b7a575082600197989960a095938993600596601f19811610610b62575b505050811b016004820155610a6d565b01515f1960f88460031b161c191690558a8080610b52565b818301518a5560019099019860209283019201610b2c565b015190508a8061080e565b90601f19831691845f52815f20925f5b818110610be85750908460019594939210610bd0575b505050811b019055610a03565b01515f1960f88460031b161c19169055898080610bc3565b92936020600181928786015181550195019301610bad565b015190508c8061080e565b90601f19831691845f52815f20925f5b818110610c565750908460019594939210610c3e575b505050811b0190556109a8565b01515f1960f88460031b161c191690558b8080610c31565b92936020600181928786015181550195019301610c1b565b90601f198316918c5f52815f20925f5b818110610cb95750908460019594939210610ca1575b505050811b018955610953565b01515f1960f88460031b161c191690558b8080610c94565b92936020600181928786015181550195019301610c7e565b01359050878061080e565b835f5260205f20915f5b601f1985168110610d2a575090839291600194601f19811610610d11575b505050811b019055610825565b01355f19600384901b60f8161c19169055868080610d04565b82820135845560019093019260209182019101610ce6565b634e487b7160e01b5f52603260045260245ffd5b630ffa118160e01b5f5260045ffd5b506080516101a051141561068c565b5060e0516101a0511415610685565b50610100516101a051141561067e565b630f58058360e11b5f5260045ffd5b63c343b2ef60e01b5f5260043560045260245ffd5b3461011957604036600319011261011957610dd0610fba565b336001600160a01b03821603610dec576101179060043561148f565b63334bd91960e11b5f5260045ffd5b3461011957604036600319011261011957610117600435610e1a610fba565b90610e3361010d825f525f602052600160405f20015490565b611407565b34610119576020366003190112610119576020610e626004355f525f602052600160405f20015490565b604051908152f35b346101195760203660031901126101195760043563ffffffff60e01b811680910361011957602090637965db0b60e01b8114908115610eaf575b506040519015158152f35b6301ffc9a760e01b14905082610ea4565b3461011957602036600319011261011957600435610edd81611333565b5f52600160205260405f2060018060a01b03600182015416610554600283015492600381015490610f1560056004830154920161118c565b91604051958695865260208601526040850152606084015260a0608084015260a0830190610f62565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b9080602083519182815201916020808360051b8301019401925f915b838310610f8d57505050505090565b9091929394602080610fab600193601f198682030187528951610f3e565b97019301930191939290610f7e565b602435906001600160a01b038216820361011957565b9181601f84011215610119578235916001600160401b038311610119576020808501948460051b01011161011957565b600254811015610d425760025f5260205f2001905f90565b9181601f84011215610119578235916001600160401b038311610119576020838186019501011161011957565b9060406003198301126101195760043591602435906001600160401b0382116101195761107491600401611018565b9091565b60c081019081106001600160401b0382111761077f57604052565b90601f801991011681019081106001600160401b0382111761077f57604052565b90600182811c921680156110e2575b60208310146110ce57565b634e487b7160e01b5f52602260045260245ffd5b91607f16916110c3565b9060405191825f8254926110ff846110b4565b808452936001811690811561116a5750600114611126575b5061112492500383611093565b565b90505f9291925260205f20905f915b81831061114e575050906020611124928201015f611117565b6020919350806001915483858901015201910190918492611135565b90506020925061112494915060ff191682840152151560051b8201015f611117565b9081546001600160401b03811161077f57604051926111b160208360051b0185611093565b81845260208401905f5260205f205f915b8383106111cf5750505050565b6001602081926111de856110ec565b8152019201920191906111c2565b9190811015610d425760051b81013590601e19813603018212156101195701908135916001600160401b038311610119576020018236038113610119579190565b919091601f831161123e575b505050565b81831161124a57505050565b5f5260205f206020601f830160051c9210611283575b81601f9101920160051c03905f5b82811015611239575f8282015560010161126e565b5f9150611260565b9190811015610d425760051b0190565b9291926001600160401b03821161077f57604051916112c4601f8201601f191660200184611093565b829481845281830111610119578281602093845f960137010152565b6020919283604051948593843782019081520301902090565b908060209392818452848401375f828201840152601f01601f1916010190565b6040906113309492815281602082015201916112f9565b90565b805f52600160205260ff600760405f200154161561134e5750565b634607cd3160e11b5f5260045260245ffd5b335f9081527f88b5e9d578fd2c8ef697d9eaf521eed09df8abdd2177a8b24330be81f4cea85e602052604090205460ff161561139857565b63e2517d3f60e01b5f52336004527f27474d19bed8c237b6f0ac3a8e704c5f2dc7c7f0e86a42e967d95cfc461c1d2260245260445ffd5b5f8181526020818152604080832033845290915290205460ff16156113f15750565b63e2517d3f60e01b5f523360045260245260445ffd5b5f818152602081815260408083206001600160a01b038616845290915290205460ff16611489575f818152602081815260408083206001600160a01b0395909516808452949091528120805460ff19166001179055339291907f2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d9080a4600190565b50505f90565b5f818152602081815260408083206001600160a01b038616845290915290205460ff1615611489575f818152602081815260408083206001600160a01b0395909516808452949091528120805460ff19169055339291907ff6391f5c32d9c69d2a47ea670b442974b53935d1edc7fd64eb21e047a839171b9080a460019056fea26469706673582212201de6d3f94a4df7977cb70905ab81a056d2642e807d21b14842ab8da4444ae87264736f6c63430008210033", sourceMap: "146:8694:23:-:0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;4723:26:15;146:8694:23;;;;:::i;:::-;4693:18:15;2484:4;4693:18;;3877:6;146:8694:23;3877:6:15;146:8694:23;;3877:22:15;146:8694:23;3877:6:15;146:8694:23;3877:22:15;146:8694:23;3786:120:15;;4693:18;2484:4;:::i;:::-;4723:26;:::i;:::-;146:8694:23;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;:::i;:::-;;;;;2484:4:15;;;:::i;:::-;2348:6:23;;;:::i;:::-;146:8694;;;;;;;5668:29;146:8694;;;5668:29;146:8694;;;:::i;:::-;;;;;;:::i;:::-;5725:32;5721:109;;5848:18;;5896:51;5848:18;;;146:8694;;;;;;;;;;;;;;;:::i;:::-;;;;;;5896:51;;;146:8694;5721:109;-1:-1:-1;146:8694:23;;-1:-1:-1;;;5780:39:23;;146:8694;;;5780:39;;146:8694;;5780:39;;;:::i;:::-;;;;146:8694;;;;;;-1:-1:-1;;146:8694:23;;;;;;;;;;;;;8642:26;146:8694;;;8642:26;146:8694;;;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;;1357:26;146:8694;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;:::i;:::-;;;;;;;;;;;2930:29:15;146:8694:23;;;;;;-1:-1:-1;146:8694:23;;;;;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;;;;;;:::i;:::-;2348:6;;;;;:::i;:::-;146:8694;;;7625:11;146:8694;;;7625:29;146:8694;;;7625:29;146:8694;;;:::i;:::-;;;;;;;;:::i;:::-;;;;:::i;:::-;;;;7625:11;146:8694;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;7688:13;;146:8694;7682:32;7678:109;;7826:13;;;146:8694;7826:13;146:8694;7826:13;;146:8694;;7826:13;;7853:25;;146:8694;;7924:22;;7960:26;;146:8694;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;:::i;:::-;;;;;;;;;7678:109;7737:39;146:8694;;;6333:39;;;;;;7737;;146:8694;7737:39;;;:::i;146:8694::-;;;;;;-1:-1:-1;;146:8694:23;;;;;8456:15;146:8694;;;;;;;;;;;;;;:::i;:::-;2484:4:15;;;;:::i;:::-;2348:6:23;;;:::i;:::-;146:8694;;;6221:11;146:8694;;;6221:29;146:8694;;;6221:29;146:8694;;;:::i;:::-;;;;;;:::i;:::-;6278:32;6274:109;;6401:17;6441:41;6401:17;;;146:8694;;;;;;;;;;;;;;;;;;;;;:::i;:::-;6441:41;;;146:8694;6274:109;146:8694;;-1:-1:-1;;;6333:39:23;;146:8694;;;6333:39;;146:8694;;6333:39;;;:::i;146:8694::-;;;;;;-1:-1:-1;;146:8694:23;;;;;;1447:32;146:8694;1447:32;;;;;;146:8694;1447:32;;:::i;:::-;146:8694;;;;;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;2348:6;;;:::i;:::-;146:8694;;;;;;;8257:33;146:8694;;;8257:33;146:8694;:::i;:::-;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;:::i;:::-;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;:::i;:::-;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;:::i;:::-;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;:::i;:::-;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;:::i;:::-;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;:::i;:::-;;;2484:4:15;;:::i;:::-;146:8694:23;;;;;;;;3619:26;146:8694;;;3619:26;146:8694;;3615:93;;3721:26;;-1:-1:-1;;;;;146:8694:23;3721:26;3717:85;;3815:25;;;3811:85;;3946:24;;3922:48;;;;;:105;;;146:8694;3922:166;;;;146:8694;3922:230;;;;146:8694;3905:312;;146:8694;;;;;;;;;;;;;;;;4324:19;;146:8694;;;;;3721:26;;146:8694;;;;;;;;;;;;4368:22;;;146:8694;4447:15;4418:26;;;146:8694;;;;4472:25;;146:8694;3619:26;4528:13;;146:8694;;;;;;;;;;4567:576;4587:24;;;;;;;4368:22;146:8694;-1:-1:-1;;;146:8694:23;;;;;;;;;;4368:22;146:8694;;:::i;:::-;;;;4418:26;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;4447:15;146:8694;;;;;;;;;3721:26;;146:8694;;5213:162;146:8694;;;5213:162;;146:8694;;;;;;;;;;;;;4613:3;4658:16;;;;;;;:::i;:::-;4632:20;;;146:8694;-1:-1:-1;;;146:8694:23;;;;;;;;4632:20;;;146:8694;;;;;;;;4632:20;;;146:8694;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;:::i;:::-;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;4759:16;146:8694;;;4759:16;;;;;;;:::i;:::-;4811:20;;146:8694;4811:20;;;;;;;;:::i;:::-;4860:13;;;;;;;;;:::i;:::-;146:8694;4906:17;4960:20;4906:17;;;;;;;:::i;:::-;4960:20;;;;;;;:::i;:::-;146:8694;;;;;;;;;:::i;:::-;;;;:::i;:::-;;;;;;:::i;:::-;4726:301;146:8694;4726:301;;146:8694;;;;4726:301;;146:8694;;;;;;:::i;:::-;4726:301;146:8694;4726:301;;146:8694;;;;;;:::i;:::-;4726:301;146:8694;4726:301;;146:8694;;;;;4726:301;;146:8694;;4706:16;;;;;;;:::i;:::-;4689;;;146:8694;;:::i;:::-;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;:::i;:::-;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;4368:22;146:8694;;;;;;4418:26;146:8694;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;:::i;:::-;;;;;:::i;:::-;;;;;;;;;;;;;4632:20;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;4726:301;;146:8694;;;;;;;;;;;;;;5059:73;5081:16;;;;;;;:::i;:::-;5099:13;;;;;;;;;:::i;:::-;146:8694;5114:17;146:8694;5114:17;;;;;;;:::i;:::-;146:8694;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;:::i;:::-;5059:73;;;146:8694;4572:13;;;;146:8694;;;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;;;;;;;;;;;;4632:20;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;4418:26;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;4418:26;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;4418:26;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;4418:26;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;4418:26:23;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;3905:312;3863:22;;;146:8694;4184:22;146:8694;;4184:22;3922:230;4128:24;;;4104:48;;;;3922:230;;:166;4067:21;;;4043:45;;;;3922:166;;:105;4010:17;;;3986:41;;;;3922:105;;3717:85;3770:21;;;146:8694;3770:21;146:8694;;3770:21;3615:93;3668:29;;;146:8694;3668:29;146:8694;;;;;;3668:29;146:8694;;;;;;-1:-1:-1;;146:8694:23;;;;;;:::i;:::-;735:10:17;-1:-1:-1;;;;;146:8694:23;;5397:34:15;5393:102;;5505:37;146:8694:23;;;5505:37:15;:::i;5393:102::-;5454:30;;;146:8694:23;5454:30:15;146:8694:23;;5454:30:15;146:8694:23;;;;;;-1:-1:-1;;146:8694:23;;;;4306:25:15;146:8694:23;;;;:::i;:::-;4276:18:15;2484:4;4276:18;;3877:6;146:8694:23;3877:6:15;146:8694:23;;3877:22:15;146:8694:23;3877:6:15;146:8694:23;3877:22:15;146:8694:23;3786:120:15;;2484:4;4306:25;:::i;146:8694:23:-;;;;;;-1:-1:-1;;146:8694:23;;;;;;;;3877:6:15;146:8694:23;3877:6:15;146:8694:23;;3877:22:15;146:8694:23;3877:6:15;146:8694:23;3877:22:15;146:8694:23;3786:120:15;;146:8694:23;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;;;;;;;;;;;;;-1:-1:-1;;;2649:47:15;;;:87;;;;146:8694:23;;;;;;;;;;2649:87:15;-1:-1:-1;;;829:40:18;;-1:-1:-1;2649:87:15;;;146:8694:23;;;;;;-1:-1:-1;;146:8694:23;;;;;;2348:6;;;:::i;:::-;146:8694;;;;;;;;;;;;;;6959:19;;146:8694;;;6992:22;;;146:8694;7028:26;;;;146:8694;7068:25;146:8694;7107:20;146:8694;7068:25;;146:8694;7107:20;;146:8694;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;;;-1:-1:-1;;146:8694:23;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;:::o;:::-;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;;;:::o;:::-;4368:22;146:8694;;;;;;4368:22;-1:-1:-1;146:8694:23;;-1:-1:-1;146:8694:23;;;-1:-1:-1;146:8694:23;:::o;:::-;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;:::o;:::-;;;-1:-1:-1;;146:8694:23;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;:::i;:::-;;;:::o;:::-;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;:::o;:::-;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;:::o;:::-;;;-1:-1:-1;146:8694:23;;;;;-1:-1:-1;146:8694:23;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;-1:-1:-1;146:8694:23;;-1:-1:-1;146:8694:23;-1:-1:-1;146:8694:23;;;;;;;;;;;:::o;:::-;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;:::o;:::-;;;;;;;;;:::o;:::-;-1:-1:-1;146:8694:23;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;;-1:-1:-1;146:8694:23;;;;;;;;;-1:-1:-1;;;146:8694:23;;;;;;;;;;;;;;:::o;:::-;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;:::i;:::-;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;;;-1:-1:-1;;146:8694:23;;;;:::o;:::-;;;;;;;;;;;;;;;;:::i;:::-;;:::o;8681:157::-;146:8694;-1:-1:-1;146:8694:23;8747:11;146:8694;;;8747:26;146:8694;-1:-1:-1;146:8694:23;8747:26;146:8694;;8746:27;8742:90;;8681:157;:::o;8742:90::-;8796:25;;;-1:-1:-1;8796:25:23;;146:8694;;-1:-1:-1;8796:25:23;3175:103:15;735:10:17;2930:6:15;146:8694:23;;;;;;;;;;;;3495:23:15;3491:108;;3175:103::o;3491:108::-;3541:47;;;2930:6;3541:47;735:10:17;3541:47:15;146:8694:23;1357:26;146:8694;;;2930:6:15;3541:47;3175:103;2930:6;146:8694:23;;;;;;;;;;;735:10:17;146:8694:23;;;;;;;;;;3495:23:15;3491:108;;3175:103;:::o;3491:108::-;3541:47;;;2930:6;3541:47;735:10:17;3541:47:15;146:8694:23;;;;2930:6:15;3541:47;6155:316;146:8694:23;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;735:10:17;;146:8694:23;;6346:40:15;;146:8694:23;6346:40:15;6323:4;6400:11;:::o;6248:217::-;6442:12;;146:8694:23;6442:12:15;:::o;6708:317::-;146:8694:23;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;735:10:17;;146:8694:23;;6900:40:15;;146:8694:23;6900:40:15;146:8694:23;6954:11:15;:::o", linkReferences: {} },
-  methodIdentifiers: { "DEFAULT_ADMIN_ROLE()": "a217fddf", "WORKFLOW_ROLE()": "93de0af9", "deactivateCovenant(bytes32,string)": "8aa1fef7", "getCovenant(bytes32,string)": "8ef5c48d", "getCovenantNames(bytes32)": "51d274de", "getLoanSchema(bytes32)": "0137f493", "getRegisteredLoanCount()": "8bb7e473", "getRoleAdmin(bytes32)": "248a9ca3", "grantRole(bytes32,address)": "2f2ff15d", "hasRole(bytes32,address)": "91d14854", "isLoanRegistered(bytes32)": "bc09792f", "registerLoan(bytes32,address,uint256,uint256,string[],string[],uint256[],string[],string[])": "3ab6613a", "registeredLoans(uint256)": "89f75e8a", "renounceRole(bytes32,address)": "36568abe", "revokeRole(bytes32,address)": "d547741f", "supportsInterface(bytes4)": "01ffc9a7", "updateCovenantThreshold(bytes32,string,uint256)": "c3d8b340" },
-  rawMetadata: '{"compiler":{"version":"0.8.33+commit.64118f21"},"language":"Solidity","output":{"abi":[{"inputs":[{"internalType":"address","name":"authorizedWorkflow","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"AccessControlBadConfirmation","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"bytes32","name":"neededRole","type":"bytes32"}],"name":"AccessControlUnauthorizedAccount","type":"error"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"string","name":"covenantName","type":"string"}],"name":"ConvenantNotFound","type":"error"},{"inputs":[],"name":"InvalidCovenantArray","type":"error"},{"inputs":[],"name":"InvalidTokenAddress","type":"error"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"LoanAlreadyRegistered","type":"error"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"LoanNotRegistered","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"string","name":"covenantName","type":"string"},{"indexed":false,"internalType":"uint256","name":"threshold","type":"uint256"},{"indexed":false,"internalType":"string","name":"thresholdType","type":"string"}],"name":"CovenantAdded","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"string","name":"covenantName","type":"string"}],"name":"CovenantDeactivated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"string","name":"covenantName","type":"string"},{"indexed":false,"internalType":"uint256","name":"newThreshold","type":"uint256"}],"name":"CovenantUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":true,"internalType":"address","name":"tokenAddress","type":"address"},{"indexed":false,"internalType":"uint256","name":"principalAmount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"covenantCount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"}],"name":"LoanRegistered","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"role","type":"bytes32"},{"indexed":true,"internalType":"bytes32","name":"previousAdminRole","type":"bytes32"},{"indexed":true,"internalType":"bytes32","name":"newAdminRole","type":"bytes32"}],"name":"RoleAdminChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"role","type":"bytes32"},{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":true,"internalType":"address","name":"sender","type":"address"}],"name":"RoleGranted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"role","type":"bytes32"},{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":true,"internalType":"address","name":"sender","type":"address"}],"name":"RoleRevoked","type":"event"},{"inputs":[],"name":"DEFAULT_ADMIN_ROLE","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"WORKFLOW_ROLE","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"string","name":"covenantName","type":"string"}],"name":"deactivateCovenant","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"string","name":"covenantName","type":"string"}],"name":"getCovenant","outputs":[{"internalType":"string","name":"name","type":"string"},{"internalType":"string","name":"metricDefinition","type":"string"},{"internalType":"uint256","name":"threshold","type":"uint256"},{"internalType":"string","name":"thresholdType","type":"string"},{"internalType":"string","name":"ebitdaAdjustments","type":"string"},{"internalType":"bool","name":"isActive","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"getCovenantNames","outputs":[{"internalType":"string[]","name":"","type":"string[]"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"getLoanSchema","outputs":[{"internalType":"address","name":"tokenAddress","type":"address"},{"internalType":"uint256","name":"principalAmount","type":"uint256"},{"internalType":"uint256","name":"onboardingTimestamp","type":"uint256"},{"internalType":"uint256","name":"reportingFrequency","type":"uint256"},{"internalType":"string[]","name":"covenantNames","type":"string[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getRegisteredLoanCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"}],"name":"getRoleAdmin","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"},{"internalType":"address","name":"account","type":"address"}],"name":"grantRole","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"},{"internalType":"address","name":"account","type":"address"}],"name":"hasRole","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"isLoanRegistered","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"address","name":"tokenAddress","type":"address"},{"internalType":"uint256","name":"principalAmount","type":"uint256"},{"internalType":"uint256","name":"reportingFrequency","type":"uint256"},{"internalType":"string[]","name":"covenantNames","type":"string[]"},{"internalType":"string[]","name":"metricDefinitions","type":"string[]"},{"internalType":"uint256[]","name":"thresholds","type":"uint256[]"},{"internalType":"string[]","name":"thresholdTypes","type":"string[]"},{"internalType":"string[]","name":"ebitdaAdjustments","type":"string[]"}],"name":"registerLoan","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"registeredLoans","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"},{"internalType":"address","name":"callerConfirmation","type":"address"}],"name":"renounceRole","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"},{"internalType":"address","name":"account","type":"address"}],"name":"revokeRole","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes4","name":"interfaceId","type":"bytes4"}],"name":"supportsInterface","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"string","name":"covenantName","type":"string"},{"internalType":"uint256","name":"newThreshold","type":"uint256"}],"name":"updateCovenantThreshold","outputs":[],"stateMutability":"nonpayable","type":"function"}],"devdoc":{"errors":{"AccessControlBadConfirmation()":[{"details":"The caller of a function is not the expected one. NOTE: Don\'t confuse with {AccessControlUnauthorizedAccount}."}],"AccessControlUnauthorizedAccount(address,bytes32)":[{"details":"The `account` is missing a role."}]},"events":{"RoleAdminChanged(bytes32,bytes32,bytes32)":{"details":"Emitted when `newAdminRole` is set as ``role``\'s admin role, replacing `previousAdminRole` `DEFAULT_ADMIN_ROLE` is the starting admin for all roles, despite {RoleAdminChanged} not being emitted to signal this."},"RoleGranted(bytes32,address,address)":{"details":"Emitted when `account` is granted `role`. `sender` is the account that originated the contract call. This account bears the admin role (for the granted role). Expected in cases where the role was granted using the internal {AccessControl-_grantRole}."},"RoleRevoked(bytes32,address,address)":{"details":"Emitted when `account` is revoked `role`. `sender` is the account that originated the contract call:   - if using `revokeRole`, it is the admin role bearer   - if using `renounceRole`, it is the role bearer (i.e. `account`)"}},"kind":"dev","methods":{"getRoleAdmin(bytes32)":{"details":"Returns the admin role that controls `role`. See {grantRole} and {revokeRole}. To change a role\'s admin, use {_setRoleAdmin}."},"grantRole(bytes32,address)":{"details":"Grants `role` to `account`. If `account` had not been already granted `role`, emits a {RoleGranted} event. Requirements: - the caller must have ``role``\'s admin role. May emit a {RoleGranted} event."},"hasRole(bytes32,address)":{"details":"Returns `true` if `account` has been granted `role`."},"registerLoan(bytes32,address,uint256,uint256,string[],string[],uint256[],string[],string[])":{"params":{"covenantNames":"Array of covenant names","ebitdaAdjustments":"Array of EBITDA calculation rules","loanId":"Unique identifier for the loan","metricDefinitions":"Array of metric calculation definitions","principalAmount":"Original loan principal (scaled by 1e18)","reportingFrequency":"How often covenants should be checked (in seconds)","thresholdTypes":"Array of threshold types (\\"MAX\\" or \\"MIN\\")","thresholds":"Array of threshold values (scaled by 1e18)","tokenAddress":"Address of the tokenized loan"}},"renounceRole(bytes32,address)":{"details":"Revokes `role` from the calling account. Roles are often managed via {grantRole} and {revokeRole}: this function\'s purpose is to provide a mechanism for accounts to lose their privileges if they are compromised (such as when a trusted device is misplaced). If the calling account had been revoked `role`, emits a {RoleRevoked} event. Requirements: - the caller must be `callerConfirmation`. May emit a {RoleRevoked} event."},"revokeRole(bytes32,address)":{"details":"Revokes `role` from `account`. If `account` had been granted `role`, emits a {RoleRevoked} event. Requirements: - the caller must have ``role``\'s admin role. May emit a {RoleRevoked} event."},"supportsInterface(bytes4)":{"details":"Returns true if this contract implements the interface defined by `interfaceId`. See the corresponding https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified[ERC section] to learn more about how these ids are created. This function call must use less than 30 000 gas."}},"version":1},"userdoc":{"kind":"user","methods":{"deactivateCovenant(bytes32,string)":{"notice":"Deactivate a covenant (stop monitoring)"},"getCovenant(bytes32,string)":{"notice":"Get specific covenant details"},"getCovenantNames(bytes32)":{"notice":"Get all covenant names for a loan"},"getLoanSchema(bytes32)":{"notice":"Get complete loan schema"},"getRegisteredLoanCount()":{"notice":"Get total number of registered loans"},"isLoanRegistered(bytes32)":{"notice":"Check if a loan is registered"},"registerLoan(bytes32,address,uint256,uint256,string[],string[],uint256[],string[],string[])":{"notice":"Register a new loan with its covenant schema"},"updateCovenantThreshold(bytes32,string,uint256)":{"notice":"Update a covenant threshold"}},"version":1}},"settings":{"compilationTarget":{"src/LoanRegistry.sol":"LoanRegistry"},"evmVersion":"prague","libraries":{},"metadata":{"bytecodeHash":"ipfs"},"optimizer":{"enabled":true,"runs":200},"remappings":[":@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/",":forge-std/=lib/forge-std/src/",":halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/",":openzeppelin-contracts/=lib/openzeppelin-contracts/"],"viaIR":true},"sources":{"lib/openzeppelin-contracts/contracts/access/AccessControl.sol":{"keccak256":"0x1a6b4f6b7798ab80929d491b89d5427a9b3338c0fd1acd0ba325f69c6f1646af","license":"MIT","urls":["bzz-raw://7bb7f346c12a14dc622bc105ce3c47202fbc89f4b153a28a63bb68193297330c","dweb:/ipfs/QmagwF8P3bUBXwdo159ueEnY9dLSvEWwK24kk2op58egwG"]},"lib/openzeppelin-contracts/contracts/access/IAccessControl.sol":{"keccak256":"0xbff9f59c84e5337689161ce7641c0ef8e872d6a7536fbc1f5133f128887aba3c","license":"MIT","urls":["bzz-raw://b308f882e796f7b79c9502deacb0a62983035c6f6f4e962b319ba6a1f4a77d3d","dweb:/ipfs/QmaWCW7ahEQqFjwhSUhV7Ae7WhfNvzSpE7DQ58hvEooqPL"]},"lib/openzeppelin-contracts/contracts/utils/Context.sol":{"keccak256":"0x493033a8d1b176a037b2cc6a04dad01a5c157722049bbecf632ca876224dd4b2","license":"MIT","urls":["bzz-raw://6a708e8a5bdb1011c2c381c9a5cfd8a9a956d7d0a9dc1bd8bcdaf52f76ef2f12","dweb:/ipfs/Qmax9WHBnVsZP46ZxEMNRQpLQnrdE4dK8LehML1Py8FowF"]},"lib/openzeppelin-contracts/contracts/utils/introspection/ERC165.sol":{"keccak256":"0x2d9dc2fe26180f74c11c13663647d38e259e45f95eb88f57b61d2160b0109d3e","license":"MIT","urls":["bzz-raw://81233d1f98060113d9922180bb0f14f8335856fe9f339134b09335e9f678c377","dweb:/ipfs/QmWh6R35SarhAn4z2wH8SU456jJSYL2FgucfTFgbHJJN4E"]},"lib/openzeppelin-contracts/contracts/utils/introspection/IERC165.sol":{"keccak256":"0x8891738ffe910f0cf2da09566928589bf5d63f4524dd734fd9cedbac3274dd5c","license":"MIT","urls":["bzz-raw://971f954442df5c2ef5b5ebf1eb245d7105d9fbacc7386ee5c796df1d45b21617","dweb:/ipfs/QmadRjHbkicwqwwh61raUEapaVEtaLMcYbQZWs9gUkgj3u"]},"src/LoanRegistry.sol":{"keccak256":"0xa96a4cec73b202a9be83db03c22d707d8c96aa237afb03177072b85ba1409706","license":"UNLICENSED","urls":["bzz-raw://6fb548ddd1e20611e4fcb5345510f709a2b6656fc8763a8eb56e9b1f5ad85e40","dweb:/ipfs/QmV7pSRxrAkSg2jaKHnrfjPE4FpfBZ3xWQo8enDnkGfRuw"]}},"version":1}',
-  metadata: { compiler: { version: "0.8.33+commit.64118f21" }, language: "Solidity", output: { abi: [{ inputs: [{ internalType: "address", name: "authorizedWorkflow", type: "address" }], stateMutability: "nonpayable", type: "constructor" }, { inputs: [], type: "error", name: "AccessControlBadConfirmation" }, { inputs: [{ internalType: "address", name: "account", type: "address" }, { internalType: "bytes32", name: "neededRole", type: "bytes32" }], type: "error", name: "AccessControlUnauthorizedAccount" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "string", name: "covenantName", type: "string" }], type: "error", name: "ConvenantNotFound" }, { inputs: [], type: "error", name: "InvalidCovenantArray" }, { inputs: [], type: "error", name: "InvalidTokenAddress" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], type: "error", name: "LoanAlreadyRegistered" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], type: "error", name: "LoanNotRegistered" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "string", name: "covenantName", type: "string", indexed: false }, { internalType: "uint256", name: "threshold", type: "uint256", indexed: false }, { internalType: "string", name: "thresholdType", type: "string", indexed: false }], type: "event", name: "CovenantAdded", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "string", name: "covenantName", type: "string", indexed: false }], type: "event", name: "CovenantDeactivated", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "string", name: "covenantName", type: "string", indexed: false }, { internalType: "uint256", name: "newThreshold", type: "uint256", indexed: false }], type: "event", name: "CovenantUpdated", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "address", name: "tokenAddress", type: "address", indexed: true }, { internalType: "uint256", name: "principalAmount", type: "uint256", indexed: false }, { internalType: "uint256", name: "covenantCount", type: "uint256", indexed: false }, { internalType: "uint256", name: "timestamp", type: "uint256", indexed: false }], type: "event", name: "LoanRegistered", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32", indexed: true }, { internalType: "bytes32", name: "previousAdminRole", type: "bytes32", indexed: true }, { internalType: "bytes32", name: "newAdminRole", type: "bytes32", indexed: true }], type: "event", name: "RoleAdminChanged", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32", indexed: true }, { internalType: "address", name: "account", type: "address", indexed: true }, { internalType: "address", name: "sender", type: "address", indexed: true }], type: "event", name: "RoleGranted", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32", indexed: true }, { internalType: "address", name: "account", type: "address", indexed: true }, { internalType: "address", name: "sender", type: "address", indexed: true }], type: "event", name: "RoleRevoked", anonymous: false }, { inputs: [], stateMutability: "view", type: "function", name: "DEFAULT_ADMIN_ROLE", outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }] }, { inputs: [], stateMutability: "view", type: "function", name: "WORKFLOW_ROLE", outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "string", name: "covenantName", type: "string" }], stateMutability: "nonpayable", type: "function", name: "deactivateCovenant" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "string", name: "covenantName", type: "string" }], stateMutability: "view", type: "function", name: "getCovenant", outputs: [{ internalType: "string", name: "name", type: "string" }, { internalType: "string", name: "metricDefinition", type: "string" }, { internalType: "uint256", name: "threshold", type: "uint256" }, { internalType: "string", name: "thresholdType", type: "string" }, { internalType: "string", name: "ebitdaAdjustments", type: "string" }, { internalType: "bool", name: "isActive", type: "bool" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "view", type: "function", name: "getCovenantNames", outputs: [{ internalType: "string[]", name: "", type: "string[]" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "view", type: "function", name: "getLoanSchema", outputs: [{ internalType: "address", name: "tokenAddress", type: "address" }, { internalType: "uint256", name: "principalAmount", type: "uint256" }, { internalType: "uint256", name: "onboardingTimestamp", type: "uint256" }, { internalType: "uint256", name: "reportingFrequency", type: "uint256" }, { internalType: "string[]", name: "covenantNames", type: "string[]" }] }, { inputs: [], stateMutability: "view", type: "function", name: "getRegisteredLoanCount", outputs: [{ internalType: "uint256", name: "", type: "uint256" }] }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32" }], stateMutability: "view", type: "function", name: "getRoleAdmin", outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }] }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32" }, { internalType: "address", name: "account", type: "address" }], stateMutability: "nonpayable", type: "function", name: "grantRole" }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32" }, { internalType: "address", name: "account", type: "address" }], stateMutability: "view", type: "function", name: "hasRole", outputs: [{ internalType: "bool", name: "", type: "bool" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "view", type: "function", name: "isLoanRegistered", outputs: [{ internalType: "bool", name: "", type: "bool" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "address", name: "tokenAddress", type: "address" }, { internalType: "uint256", name: "principalAmount", type: "uint256" }, { internalType: "uint256", name: "reportingFrequency", type: "uint256" }, { internalType: "string[]", name: "covenantNames", type: "string[]" }, { internalType: "string[]", name: "metricDefinitions", type: "string[]" }, { internalType: "uint256[]", name: "thresholds", type: "uint256[]" }, { internalType: "string[]", name: "thresholdTypes", type: "string[]" }, { internalType: "string[]", name: "ebitdaAdjustments", type: "string[]" }], stateMutability: "nonpayable", type: "function", name: "registerLoan" }, { inputs: [{ internalType: "uint256", name: "", type: "uint256" }], stateMutability: "view", type: "function", name: "registeredLoans", outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }] }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32" }, { internalType: "address", name: "callerConfirmation", type: "address" }], stateMutability: "nonpayable", type: "function", name: "renounceRole" }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32" }, { internalType: "address", name: "account", type: "address" }], stateMutability: "nonpayable", type: "function", name: "revokeRole" }, { inputs: [{ internalType: "bytes4", name: "interfaceId", type: "bytes4" }], stateMutability: "view", type: "function", name: "supportsInterface", outputs: [{ internalType: "bool", name: "", type: "bool" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "string", name: "covenantName", type: "string" }, { internalType: "uint256", name: "newThreshold", type: "uint256" }], stateMutability: "nonpayable", type: "function", name: "updateCovenantThreshold" }], devdoc: { kind: "dev", methods: { "getRoleAdmin(bytes32)": { details: "Returns the admin role that controls `role`. See {grantRole} and {revokeRole}. To change a role's admin, use {_setRoleAdmin}." }, "grantRole(bytes32,address)": { details: "Grants `role` to `account`. If `account` had not been already granted `role`, emits a {RoleGranted} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleGranted} event." }, "hasRole(bytes32,address)": { details: "Returns `true` if `account` has been granted `role`." }, "registerLoan(bytes32,address,uint256,uint256,string[],string[],uint256[],string[],string[])": { params: { covenantNames: "Array of covenant names", ebitdaAdjustments: "Array of EBITDA calculation rules", loanId: "Unique identifier for the loan", metricDefinitions: "Array of metric calculation definitions", principalAmount: "Original loan principal (scaled by 1e18)", reportingFrequency: "How often covenants should be checked (in seconds)", thresholdTypes: 'Array of threshold types ("MAX" or "MIN")', thresholds: "Array of threshold values (scaled by 1e18)", tokenAddress: "Address of the tokenized loan" } }, "renounceRole(bytes32,address)": { details: "Revokes `role` from the calling account. Roles are often managed via {grantRole} and {revokeRole}: this function's purpose is to provide a mechanism for accounts to lose their privileges if they are compromised (such as when a trusted device is misplaced). If the calling account had been revoked `role`, emits a {RoleRevoked} event. Requirements: - the caller must be `callerConfirmation`. May emit a {RoleRevoked} event." }, "revokeRole(bytes32,address)": { details: "Revokes `role` from `account`. If `account` had been granted `role`, emits a {RoleRevoked} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleRevoked} event." }, "supportsInterface(bytes4)": { details: "Returns true if this contract implements the interface defined by `interfaceId`. See the corresponding https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified[ERC section] to learn more about how these ids are created. This function call must use less than 30 000 gas." } }, version: 1 }, userdoc: { kind: "user", methods: { "deactivateCovenant(bytes32,string)": { notice: "Deactivate a covenant (stop monitoring)" }, "getCovenant(bytes32,string)": { notice: "Get specific covenant details" }, "getCovenantNames(bytes32)": { notice: "Get all covenant names for a loan" }, "getLoanSchema(bytes32)": { notice: "Get complete loan schema" }, "getRegisteredLoanCount()": { notice: "Get total number of registered loans" }, "isLoanRegistered(bytes32)": { notice: "Check if a loan is registered" }, "registerLoan(bytes32,address,uint256,uint256,string[],string[],uint256[],string[],string[])": { notice: "Register a new loan with its covenant schema" }, "updateCovenantThreshold(bytes32,string,uint256)": { notice: "Update a covenant threshold" } }, version: 1 } }, settings: { remappings: ["@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/", "erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/", "forge-std/=lib/forge-std/src/", "halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/", "openzeppelin-contracts/=lib/openzeppelin-contracts/"], optimizer: { enabled: true, runs: 200 }, metadata: { bytecodeHash: "ipfs" }, compilationTarget: { "src/LoanRegistry.sol": "LoanRegistry" }, evmVersion: "prague", libraries: {}, viaIR: true }, sources: { "lib/openzeppelin-contracts/contracts/access/AccessControl.sol": { keccak256: "0x1a6b4f6b7798ab80929d491b89d5427a9b3338c0fd1acd0ba325f69c6f1646af", urls: ["bzz-raw://7bb7f346c12a14dc622bc105ce3c47202fbc89f4b153a28a63bb68193297330c", "dweb:/ipfs/QmagwF8P3bUBXwdo159ueEnY9dLSvEWwK24kk2op58egwG"], license: "MIT" }, "lib/openzeppelin-contracts/contracts/access/IAccessControl.sol": { keccak256: "0xbff9f59c84e5337689161ce7641c0ef8e872d6a7536fbc1f5133f128887aba3c", urls: ["bzz-raw://b308f882e796f7b79c9502deacb0a62983035c6f6f4e962b319ba6a1f4a77d3d", "dweb:/ipfs/QmaWCW7ahEQqFjwhSUhV7Ae7WhfNvzSpE7DQ58hvEooqPL"], license: "MIT" }, "lib/openzeppelin-contracts/contracts/utils/Context.sol": { keccak256: "0x493033a8d1b176a037b2cc6a04dad01a5c157722049bbecf632ca876224dd4b2", urls: ["bzz-raw://6a708e8a5bdb1011c2c381c9a5cfd8a9a956d7d0a9dc1bd8bcdaf52f76ef2f12", "dweb:/ipfs/Qmax9WHBnVsZP46ZxEMNRQpLQnrdE4dK8LehML1Py8FowF"], license: "MIT" }, "lib/openzeppelin-contracts/contracts/utils/introspection/ERC165.sol": { keccak256: "0x2d9dc2fe26180f74c11c13663647d38e259e45f95eb88f57b61d2160b0109d3e", urls: ["bzz-raw://81233d1f98060113d9922180bb0f14f8335856fe9f339134b09335e9f678c377", "dweb:/ipfs/QmWh6R35SarhAn4z2wH8SU456jJSYL2FgucfTFgbHJJN4E"], license: "MIT" }, "lib/openzeppelin-contracts/contracts/utils/introspection/IERC165.sol": { keccak256: "0x8891738ffe910f0cf2da09566928589bf5d63f4524dd734fd9cedbac3274dd5c", urls: ["bzz-raw://971f954442df5c2ef5b5ebf1eb245d7105d9fbacc7386ee5c796df1d45b21617", "dweb:/ipfs/QmadRjHbkicwqwwh61raUEapaVEtaLMcYbQZWs9gUkgj3u"], license: "MIT" }, "src/LoanRegistry.sol": { keccak256: "0xa96a4cec73b202a9be83db03c22d707d8c96aa237afb03177072b85ba1409706", urls: ["bzz-raw://6fb548ddd1e20611e4fcb5345510f709a2b6656fc8763a8eb56e9b1f5ad85e40", "dweb:/ipfs/QmV7pSRxrAkSg2jaKHnrfjPE4FpfBZ3xWQo8enDnkGfRuw"], license: "UNLICENSED" } }, version: 1 },
-  id: 23
-};
-var LoanRegistryAbi = LoanRegistry_default.abi;
 var configSchema = exports_external.object({
   aiProvider: exports_external.enum(["claude", "openai"]),
   aiModel: exports_external.string(),
-  aiApiKey: exports_external.string().default(""),
   loanRegistryAddress: exports_external.string(),
   chainSelectorName: exports_external.string(),
   gasLimit: exports_external.string()
@@ -15700,9 +15909,7 @@ var onHttpTrigger = (runtime2, payload) => {
     runtime2.log(`[Step 1] Token address: ${input.tokenAddress}`);
     runtime2.log(`[Step 1] Principal (wei): ${input.principalAmountWei}`);
     const secretId = runtime2.config.aiProvider === "claude" ? "CLAUDE_API_KEY" : "OPENAI_API_KEY";
-    const secret = runtime2.getSecret({ id: secretId }).result();
-    console.log(`Retrieved secret ${JSON.stringify(secret)}`);
-    const apiKey = secret.value;
+    const apiKey = runtime2.getSecret({ id: secretId }).result().value;
     runtime2.log(`[Step 2] AI provider: ${runtime2.config.aiProvider} / model: ${runtime2.config.aiModel}`);
     runtime2.log("[Step 3] Extracting covenant schema via AI (running in node mode)...");
     const httpClient = new ClientCapability2;
@@ -15722,22 +15929,18 @@ var onHttpTrigger = (runtime2, payload) => {
     const scaledThresholds = extractedSchema.thresholds.map((t) => BigInt(Math.round(t * 1000000000000000000)));
     const reportingFrequencySecs = BigInt((extractedSchema.reportingFrequencyDays || 30) * 24 * 60 * 60);
     const principalWei = BigInt(input.principalAmountWei);
-    runtime2.log("[Step 5] Encoding registerLoan call data...");
-    const callData = encodeFunctionData({
-      abi: LoanRegistryAbi,
-      functionName: "registerLoan",
-      args: [
-        loanId,
-        input.tokenAddress,
-        principalWei,
-        reportingFrequencySecs,
-        extractedSchema.covenantNames,
-        extractedSchema.metricDefinitions,
-        scaledThresholds,
-        extractedSchema.thresholdTypes,
-        extractedSchema.ebitdaAdjustments
-      ]
-    });
+    runtime2.log("[Step 5] ABI-encoding loan registration parameters for onReport...");
+    const callData = encodeAbiParameters(parseAbiParameters("bytes32, address, uint256, uint256, string[], string[], uint256[], string[], string[]"), [
+      loanId,
+      input.tokenAddress,
+      principalWei,
+      reportingFrequencySecs,
+      extractedSchema.covenantNames,
+      extractedSchema.metricDefinitions,
+      scaledThresholds,
+      extractedSchema.thresholdTypes,
+      extractedSchema.ebitdaAdjustments
+    ]);
     runtime2.log("[Step 6] Generating signed consensus report...");
     const reportResponse = runtime2.report({
       encodedPayload: hexToBase64(callData),

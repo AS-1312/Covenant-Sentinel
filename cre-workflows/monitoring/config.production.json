@@ -8,6 +8,5 @@
   "chainSelectorName": "ethereum-testnet-sepolia",
   "gasLimit": "3000000",
   "aiProvider": "claude",
-  "aiModel": "claude-opus-4-6",
-  "aiApiKey": ""
+  "aiModel": "claude-opus-4-6"
 }

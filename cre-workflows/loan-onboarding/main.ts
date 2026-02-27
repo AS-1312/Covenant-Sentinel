@@ -41,9 +41,8 @@ import {
 	decodeJson,
 	ok,
 } from '@chainlink/cre-sdk'
-import { type Address, encodeFunctionData, keccak256, toBytes } from 'viem'
+import { type Address, encodeAbiParameters, parseAbiParameters, keccak256, toBytes } from 'viem'
 import { z } from 'zod'
-import { LoanRegistryAbi } from '../contracts/abi'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Config schema
@@ -54,10 +53,6 @@ const configSchema = z.object({
 	aiProvider: z.enum(['claude', 'openai']),
 	// Model name, e.g. 'claude-opus-4-6' or 'gpt-4o'
 	aiModel: z.string(),
-	// FOR LOCAL SIMULATION ONLY: set the API key directly in config.
-	// runtime.getSecret() only works on deployed DON nodes, not in the simulator.
-	// Leave empty string ("") for production — the workflow will use runtime.getSecret() instead.
-	aiApiKey: z.string().default(''),
 	// Deployed LoanRegistry contract address (must have WORKFLOW_ROLE granted to CRE forwarder)
 	loanRegistryAddress: z.string(),
 	// Chain selector name for the target network
@@ -286,15 +281,10 @@ const onHttpTrigger = (runtime: Runtime<Config>, payload: HTTPPayload): string =
 		runtime.log(`[Step 1] Principal (wei): ${input.principalAmountWei}`)
 
 		// ───────────────────────────────────────────────────────────────────────
-		// Step 2: Retrieve AI API key
-		// In simulation: reads from config.aiApiKey (runtime.getSecret() is not
-		//   supported by the local simulator — it only works on deployed DON nodes).
-		// In production: reads from the DON Vault via runtime.getSecret().
+		// Step 2: Retrieve AI API key from the DON Vault via runtime.getSecret().
 		// ───────────────────────────────────────────────────────────────────────
 		const secretId = runtime.config.aiProvider === 'claude' ? 'CLAUDE_API_KEY' : 'OPENAI_API_KEY'
-		const secret = runtime.getSecret({ id: secretId }).result();
-        console.log(`Retrieved secret ${JSON.stringify(secret)}`)
-        const apiKey = secret.value
+		const apiKey = runtime.getSecret({ id: secretId }).result().value
 
 		runtime.log(`[Step 2] AI provider: ${runtime.config.aiProvider} / model: ${runtime.config.aiModel}`)
 
@@ -360,19 +350,21 @@ const onHttpTrigger = (runtime: Runtime<Config>, payload: HTTPPayload): string =
 		const principalWei = BigInt(input.principalAmountWei)
 
 		// ───────────────────────────────────────────────────────────────────────
-		// Step 5: ABI-encode the registerLoan call
+		// Step 5: ABI-encode the loan registration parameters
 		//
-		// NOTE: writeReport() delivers the encoded payload to the receiver
-		//       contract's onReport(bytes metadata, bytes rawReport) function.
-		//       Ensure the LoanRegistry (or a thin wrapper) implements IReceiver
-		//       and grants WORKFLOW_ROLE to the CRE forwarder address.
+		// LoanRegistry implements IReceiverTemplate: writeReport() calls
+		//   onReport(bytes metadata, bytes report)
+		// where `report` is abi.decode'd inside the contract to extract the
+		// loan fields. We use encodeAbiParameters (no 4-byte selector) because
+		// registerLoan is an internal function — not a public dispatcher.
 		// ───────────────────────────────────────────────────────────────────────
-		runtime.log('[Step 5] Encoding registerLoan call data...')
+		runtime.log('[Step 5] ABI-encoding loan registration parameters for onReport...')
 
-		const callData = encodeFunctionData({
-			abi: LoanRegistryAbi,
-			functionName: 'registerLoan',
-			args: [
+		const callData = encodeAbiParameters(
+			parseAbiParameters(
+				'bytes32, address, uint256, uint256, string[], string[], uint256[], string[], string[]',
+			),
+			[
 				loanId as `0x${string}`,
 				input.tokenAddress as Address,
 				principalWei,
@@ -383,7 +375,7 @@ const onHttpTrigger = (runtime: Runtime<Config>, payload: HTTPPayload): string =
 				extractedSchema.thresholdTypes,
 				extractedSchema.ebitdaAdjustments,
 			],
-		})
+		)
 
 		// ───────────────────────────────────────────────────────────────────────
 		// Step 6: Generate a consensus-signed CRE report
