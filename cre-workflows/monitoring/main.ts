@@ -45,9 +45,9 @@ import {
 	TxStatus,
 	ok,
 } from '@chainlink/cre-sdk'
-import { encodeFunctionData, decodeFunctionResult } from 'viem'
+import { encodeAbiParameters, parseAbiParameters, encodeFunctionData, decodeFunctionResult } from 'viem'
 import { z } from 'zod'
-import { LoanRegistryAbi, LoanHealthFeedAbi } from '../contracts/abi'
+import { LoanRegistryAbi } from '../contracts/abi'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Config schema
@@ -122,6 +122,11 @@ interface BorrowerFinancials {
 // ─────────────────────────────────────────────────────────────────────────────
 // Enum mappings  (must match LoanHealthFeed.sol enum ordinals)
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Strip markdown code fences (```json ... ```) that LLMs sometimes wrap around JSON output */
+function stripMarkdownFences(text: string): string {
+	return text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim()
+}
 
 const STATUS_MAP = { PASS: 0, WARNING: 1, BREACH: 2 } as const
 const TREND_MAP = { IMPROVING: 0, STABLE: 1, DETERIORATING: 2 } as const
@@ -243,7 +248,7 @@ function callClaude(
 		throw new Error('Malformed Claude response: missing content[0].text')
 	}
 
-	return JSON.parse(content) as CovenantEvaluation
+	return JSON.parse(stripMarkdownFences(content)) as CovenantEvaluation
 }
 
 function callOpenAI(
@@ -290,7 +295,7 @@ function callOpenAI(
 		throw new Error('Malformed OpenAI response: missing choices[0].message.content')
 	}
 
-	return JSON.parse(content) as CovenantEvaluation
+	return JSON.parse(stripMarkdownFences(content)) as CovenantEvaluation
 }
 
 /**
@@ -452,7 +457,7 @@ const onCronTrigger = (runtime: Runtime<Config>, _payload: CronPayload): string 
 		const evaluation = httpClient
 			.sendRequest(
 				runtime,
-				buildAIRequest(quarterLabel, covenantSchemas, apiKey),
+				buildAIRequest(quarter.toString(), covenantSchemas, apiKey),
 				consensusIdenticalAggregation<CovenantEvaluation>(),
 			)(config)
 			.result()
@@ -470,30 +475,33 @@ const onCronTrigger = (runtime: Runtime<Config>, _payload: CronPayload): string 
 		runtime.log('[Step 5] Publishing health report to LoanHealthFeed...')
 		runtime.log(`[Step 5] Contract: ${config.loanHealthFeedAddress}`)
 
-		const callData = encodeFunctionData({
-			abi: LoanHealthFeedAbi,
-			functionName: 'publishHealthReport',
-			args: [
-				{
-					loanId: config.loanId as `0x${string}`,
-					overallStatus: STATUS_MAP[evaluation.overallStatus],
-					overallTrend: TREND_MAP[evaluation.overallTrend],
-					overallConfidenceScore: BigInt(evaluation.overallConfidenceScore),
-					riskNarrative: evaluation.riskNarrative,
-					covenantNames: evaluation.covenantEvaluations.map((c) => c.covenantName),
-					statuses: evaluation.covenantEvaluations.map((c) => STATUS_MAP[c.status]),
-					calculatedValues: evaluation.covenantEvaluations.map((c) =>
-						BigInt(Math.round(c.calculatedValue * 1e18)),
-					),
-					thresholds: covenantSchemas.map((s) => BigInt(Math.round(s.threshold * 1e18))),
-					confidenceScores: evaluation.covenantEvaluations.map((c) =>
-						BigInt(c.confidenceScore),
-					),
-					trends: evaluation.covenantEvaluations.map((c) => TREND_MAP[c.trend]),
-					notes: evaluation.covenantEvaluations.map((c) => c.notes),
-				},
+		// LoanHealthFeed implements IReceiverTemplate: writeReport() calls
+		//   onReport(bytes metadata, bytes report)
+		// where `report` is abi.decode'd as PublishReportInput struct.
+		// Encode as flat named params (struct fields) — no 4-byte selector.
+		const callData = encodeAbiParameters(
+			parseAbiParameters(
+				'bytes32 loanId, uint8 overallStatus, uint8 overallTrend, uint256 overallConfidenceScore, string riskNarrative, string[] covenantNames, uint8[] statuses, uint256[] calculatedValues, uint256[] thresholds, uint256[] confidenceScores, uint8[] trends, string[] notes',
+			),
+			[
+				config.loanId as `0x${string}`,
+				BigInt(STATUS_MAP[evaluation.overallStatus]),
+				BigInt(TREND_MAP[evaluation.overallTrend]),
+				BigInt(evaluation.overallConfidenceScore),
+				evaluation.riskNarrative,
+				evaluation.covenantEvaluations.map((c) => c.covenantName),
+				evaluation.covenantEvaluations.map((c) => BigInt(STATUS_MAP[c.status])),
+				evaluation.covenantEvaluations.map((c) =>
+					BigInt(Math.round(c.calculatedValue * 1e18)),
+				),
+				covenantSchemas.map((s) => BigInt(Math.round(s.threshold * 1e18))),
+				evaluation.covenantEvaluations.map((c) =>
+					BigInt(c.confidenceScore),
+				),
+				evaluation.covenantEvaluations.map((c) => BigInt(TREND_MAP[c.trend])),
+				evaluation.covenantEvaluations.map((c) => c.notes),
 			],
-		})
+		)
 
 		const reportResponse = runtime
 			.report({

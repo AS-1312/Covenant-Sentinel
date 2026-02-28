@@ -10,11 +10,74 @@ var __export = (target, all) => {
     });
 };
 var __esm = (fn, res) => () => (fn && (res = fn(fn = 0)), res);
+var version = "1.0.8";
+var BaseError;
+var init_errors = __esm(() => {
+  BaseError = class BaseError2 extends Error {
+    constructor(shortMessage, args = {}) {
+      const details = args.cause instanceof BaseError2 ? args.cause.details : args.cause?.message ? args.cause.message : args.details;
+      const docsPath = args.cause instanceof BaseError2 ? args.cause.docsPath || args.docsPath : args.docsPath;
+      const message = [
+        shortMessage || "An error occurred.",
+        "",
+        ...args.metaMessages ? [...args.metaMessages, ""] : [],
+        ...docsPath ? [`Docs: https://abitype.dev${docsPath}`] : [],
+        ...details ? [`Details: ${details}`] : [],
+        `Version: abitype@${version}`
+      ].join(`
+`);
+      super(message);
+      Object.defineProperty(this, "details", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      Object.defineProperty(this, "docsPath", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      Object.defineProperty(this, "metaMessages", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      Object.defineProperty(this, "shortMessage", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "AbiTypeError"
+      });
+      if (args.cause)
+        this.cause = args.cause;
+      this.details = details;
+      this.docsPath = docsPath;
+      this.metaMessages = args.metaMessages;
+      this.shortMessage = shortMessage;
+    }
+  };
+});
 function execTyped(regex, string) {
   const match = regex.exec(string);
   return match?.groups;
 }
-var init_regex = () => {};
+var bytesRegex;
+var integerRegex;
+var isTupleRegex;
+var init_regex = __esm(() => {
+  bytesRegex = /^bytes([1-9]|1[0-9]|2[0-9]|3[0-2])?$/;
+  integerRegex = /^u?int(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)?$/;
+  isTupleRegex = /^\(.+?\).*?$/;
+});
 function formatAbiParameter(abiParameter) {
   let type = abiParameter.type;
   if (tupleRegex.test(abiParameter.type) && "components" in abiParameter) {
@@ -74,8 +137,522 @@ function formatAbiItem(abiItem) {
 var init_formatAbiItem = __esm(() => {
   init_formatAbiParameters();
 });
+function isStructSignature(signature) {
+  return structSignatureRegex.test(signature);
+}
+function execStructSignature(signature) {
+  return execTyped(structSignatureRegex, signature);
+}
+var structSignatureRegex;
+var modifiers;
+var eventModifiers;
+var functionModifiers;
+var init_signatures = __esm(() => {
+  init_regex();
+  structSignatureRegex = /^struct (?<name>[a-zA-Z$_][a-zA-Z0-9$_]*) \{(?<properties>.*?)\}$/;
+  modifiers = new Set([
+    "memory",
+    "indexed",
+    "storage",
+    "calldata"
+  ]);
+  eventModifiers = new Set(["indexed"]);
+  functionModifiers = new Set([
+    "calldata",
+    "memory",
+    "storage"
+  ]);
+});
+var UnknownTypeError;
+var UnknownSolidityTypeError;
+var init_abiItem = __esm(() => {
+  init_errors();
+  UnknownTypeError = class UnknownTypeError2 extends BaseError {
+    constructor({ type }) {
+      super("Unknown type.", {
+        metaMessages: [
+          `Type "${type}" is not a valid ABI type. Perhaps you forgot to include a struct signature?`
+        ]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "UnknownTypeError"
+      });
+    }
+  };
+  UnknownSolidityTypeError = class UnknownSolidityTypeError2 extends BaseError {
+    constructor({ type }) {
+      super("Unknown type.", {
+        metaMessages: [`Type "${type}" is not a valid ABI type.`]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "UnknownSolidityTypeError"
+      });
+    }
+  };
+});
+var InvalidAbiParametersError;
+var InvalidParameterError;
+var SolidityProtectedKeywordError;
+var InvalidModifierError;
+var InvalidFunctionModifierError;
+var InvalidAbiTypeParameterError;
+var init_abiParameter = __esm(() => {
+  init_errors();
+  InvalidAbiParametersError = class InvalidAbiParametersError2 extends BaseError {
+    constructor({ params }) {
+      super("Failed to parse ABI parameters.", {
+        details: `parseAbiParameters(${JSON.stringify(params, null, 2)})`,
+        docsPath: "/api/human#parseabiparameters-1"
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidAbiParametersError"
+      });
+    }
+  };
+  InvalidParameterError = class InvalidParameterError2 extends BaseError {
+    constructor({ param }) {
+      super("Invalid ABI parameter.", {
+        details: param
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidParameterError"
+      });
+    }
+  };
+  SolidityProtectedKeywordError = class SolidityProtectedKeywordError2 extends BaseError {
+    constructor({ param, name }) {
+      super("Invalid ABI parameter.", {
+        details: param,
+        metaMessages: [
+          `"${name}" is a protected Solidity keyword. More info: https://docs.soliditylang.org/en/latest/cheatsheet.html`
+        ]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "SolidityProtectedKeywordError"
+      });
+    }
+  };
+  InvalidModifierError = class InvalidModifierError2 extends BaseError {
+    constructor({ param, type, modifier }) {
+      super("Invalid ABI parameter.", {
+        details: param,
+        metaMessages: [
+          `Modifier "${modifier}" not allowed${type ? ` in "${type}" type` : ""}.`
+        ]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidModifierError"
+      });
+    }
+  };
+  InvalidFunctionModifierError = class InvalidFunctionModifierError2 extends BaseError {
+    constructor({ param, type, modifier }) {
+      super("Invalid ABI parameter.", {
+        details: param,
+        metaMessages: [
+          `Modifier "${modifier}" not allowed${type ? ` in "${type}" type` : ""}.`,
+          `Data location can only be specified for array, struct, or mapping types, but "${modifier}" was given.`
+        ]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidFunctionModifierError"
+      });
+    }
+  };
+  InvalidAbiTypeParameterError = class InvalidAbiTypeParameterError2 extends BaseError {
+    constructor({ abiParameter }) {
+      super("Invalid ABI parameter.", {
+        details: JSON.stringify(abiParameter, null, 2),
+        metaMessages: ["ABI parameter type is invalid."]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidAbiTypeParameterError"
+      });
+    }
+  };
+});
+var InvalidSignatureError;
+var InvalidStructSignatureError;
+var init_signature = __esm(() => {
+  init_errors();
+  InvalidSignatureError = class InvalidSignatureError2 extends BaseError {
+    constructor({ signature, type }) {
+      super(`Invalid ${type} signature.`, {
+        details: signature
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidSignatureError"
+      });
+    }
+  };
+  InvalidStructSignatureError = class InvalidStructSignatureError2 extends BaseError {
+    constructor({ signature }) {
+      super("Invalid struct signature.", {
+        details: signature,
+        metaMessages: ["No properties exist."]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidStructSignatureError"
+      });
+    }
+  };
+});
+var CircularReferenceError;
+var init_struct = __esm(() => {
+  init_errors();
+  CircularReferenceError = class CircularReferenceError2 extends BaseError {
+    constructor({ type }) {
+      super("Circular reference detected.", {
+        metaMessages: [`Struct "${type}" is a circular reference.`]
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "CircularReferenceError"
+      });
+    }
+  };
+});
+var InvalidParenthesisError;
+var init_splitParameters = __esm(() => {
+  init_errors();
+  InvalidParenthesisError = class InvalidParenthesisError2 extends BaseError {
+    constructor({ current, depth }) {
+      super("Unbalanced parentheses.", {
+        metaMessages: [
+          `"${current.trim()}" has too many ${depth > 0 ? "opening" : "closing"} parentheses.`
+        ],
+        details: `Depth "${depth}"`
+      });
+      Object.defineProperty(this, "name", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: "InvalidParenthesisError"
+      });
+    }
+  };
+});
+function getParameterCacheKey(param, type, structs) {
+  let structKey = "";
+  if (structs)
+    for (const struct of Object.entries(structs)) {
+      if (!struct)
+        continue;
+      let propertyKey = "";
+      for (const property of struct[1]) {
+        propertyKey += `[${property.type}${property.name ? `:${property.name}` : ""}]`;
+      }
+      structKey += `(${struct[0]}{${propertyKey}})`;
+    }
+  if (type)
+    return `${type}:${param}${structKey}`;
+  return param;
+}
+var parameterCache;
+var init_cache = __esm(() => {
+  parameterCache = new Map([
+    ["address", { type: "address" }],
+    ["bool", { type: "bool" }],
+    ["bytes", { type: "bytes" }],
+    ["bytes32", { type: "bytes32" }],
+    ["int", { type: "int256" }],
+    ["int256", { type: "int256" }],
+    ["string", { type: "string" }],
+    ["uint", { type: "uint256" }],
+    ["uint8", { type: "uint8" }],
+    ["uint16", { type: "uint16" }],
+    ["uint24", { type: "uint24" }],
+    ["uint32", { type: "uint32" }],
+    ["uint64", { type: "uint64" }],
+    ["uint96", { type: "uint96" }],
+    ["uint112", { type: "uint112" }],
+    ["uint160", { type: "uint160" }],
+    ["uint192", { type: "uint192" }],
+    ["uint256", { type: "uint256" }],
+    ["address owner", { type: "address", name: "owner" }],
+    ["address to", { type: "address", name: "to" }],
+    ["bool approved", { type: "bool", name: "approved" }],
+    ["bytes _data", { type: "bytes", name: "_data" }],
+    ["bytes data", { type: "bytes", name: "data" }],
+    ["bytes signature", { type: "bytes", name: "signature" }],
+    ["bytes32 hash", { type: "bytes32", name: "hash" }],
+    ["bytes32 r", { type: "bytes32", name: "r" }],
+    ["bytes32 root", { type: "bytes32", name: "root" }],
+    ["bytes32 s", { type: "bytes32", name: "s" }],
+    ["string name", { type: "string", name: "name" }],
+    ["string symbol", { type: "string", name: "symbol" }],
+    ["string tokenURI", { type: "string", name: "tokenURI" }],
+    ["uint tokenId", { type: "uint256", name: "tokenId" }],
+    ["uint8 v", { type: "uint8", name: "v" }],
+    ["uint256 balance", { type: "uint256", name: "balance" }],
+    ["uint256 tokenId", { type: "uint256", name: "tokenId" }],
+    ["uint256 value", { type: "uint256", name: "value" }],
+    [
+      "event:address indexed from",
+      { type: "address", name: "from", indexed: true }
+    ],
+    ["event:address indexed to", { type: "address", name: "to", indexed: true }],
+    [
+      "event:uint indexed tokenId",
+      { type: "uint256", name: "tokenId", indexed: true }
+    ],
+    [
+      "event:uint256 indexed tokenId",
+      { type: "uint256", name: "tokenId", indexed: true }
+    ]
+  ]);
+});
+function parseAbiParameter(param, options) {
+  const parameterCacheKey = getParameterCacheKey(param, options?.type, options?.structs);
+  if (parameterCache.has(parameterCacheKey))
+    return parameterCache.get(parameterCacheKey);
+  const isTuple = isTupleRegex.test(param);
+  const match = execTyped(isTuple ? abiParameterWithTupleRegex : abiParameterWithoutTupleRegex, param);
+  if (!match)
+    throw new InvalidParameterError({ param });
+  if (match.name && isSolidityKeyword(match.name))
+    throw new SolidityProtectedKeywordError({ param, name: match.name });
+  const name = match.name ? { name: match.name } : {};
+  const indexed = match.modifier === "indexed" ? { indexed: true } : {};
+  const structs = options?.structs ?? {};
+  let type;
+  let components = {};
+  if (isTuple) {
+    type = "tuple";
+    const params = splitParameters(match.type);
+    const components_ = [];
+    const length = params.length;
+    for (let i2 = 0;i2 < length; i2++) {
+      components_.push(parseAbiParameter(params[i2], { structs }));
+    }
+    components = { components: components_ };
+  } else if (match.type in structs) {
+    type = "tuple";
+    components = { components: structs[match.type] };
+  } else if (dynamicIntegerRegex.test(match.type)) {
+    type = `${match.type}256`;
+  } else {
+    type = match.type;
+    if (!(options?.type === "struct") && !isSolidityType(type))
+      throw new UnknownSolidityTypeError({ type });
+  }
+  if (match.modifier) {
+    if (!options?.modifiers?.has?.(match.modifier))
+      throw new InvalidModifierError({
+        param,
+        type: options?.type,
+        modifier: match.modifier
+      });
+    if (functionModifiers.has(match.modifier) && !isValidDataLocation(type, !!match.array))
+      throw new InvalidFunctionModifierError({
+        param,
+        type: options?.type,
+        modifier: match.modifier
+      });
+  }
+  const abiParameter = {
+    type: `${type}${match.array ?? ""}`,
+    ...name,
+    ...indexed,
+    ...components
+  };
+  parameterCache.set(parameterCacheKey, abiParameter);
+  return abiParameter;
+}
+function splitParameters(params, result = [], current = "", depth = 0) {
+  const length = params.trim().length;
+  for (let i2 = 0;i2 < length; i2++) {
+    const char = params[i2];
+    const tail = params.slice(i2 + 1);
+    switch (char) {
+      case ",":
+        return depth === 0 ? splitParameters(tail, [...result, current.trim()]) : splitParameters(tail, result, `${current}${char}`, depth);
+      case "(":
+        return splitParameters(tail, result, `${current}${char}`, depth + 1);
+      case ")":
+        return splitParameters(tail, result, `${current}${char}`, depth - 1);
+      default:
+        return splitParameters(tail, result, `${current}${char}`, depth);
+    }
+  }
+  if (current === "")
+    return result;
+  if (depth !== 0)
+    throw new InvalidParenthesisError({ current, depth });
+  result.push(current.trim());
+  return result;
+}
+function isSolidityType(type) {
+  return type === "address" || type === "bool" || type === "function" || type === "string" || bytesRegex.test(type) || integerRegex.test(type);
+}
+function isSolidityKeyword(name) {
+  return name === "address" || name === "bool" || name === "function" || name === "string" || name === "tuple" || bytesRegex.test(name) || integerRegex.test(name) || protectedKeywordsRegex.test(name);
+}
+function isValidDataLocation(type, isArray) {
+  return isArray || type === "bytes" || type === "string" || type === "tuple";
+}
+var abiParameterWithoutTupleRegex;
+var abiParameterWithTupleRegex;
+var dynamicIntegerRegex;
+var protectedKeywordsRegex;
+var init_utils = __esm(() => {
+  init_regex();
+  init_abiItem();
+  init_abiParameter();
+  init_splitParameters();
+  init_cache();
+  init_signatures();
+  abiParameterWithoutTupleRegex = /^(?<type>[a-zA-Z$_][a-zA-Z0-9$_]*)(?<array>(?:\[\d*?\])+?)?(?:\s(?<modifier>calldata|indexed|memory|storage{1}))?(?:\s(?<name>[a-zA-Z$_][a-zA-Z0-9$_]*))?$/;
+  abiParameterWithTupleRegex = /^\((?<type>.+?)\)(?<array>(?:\[\d*?\])+?)?(?:\s(?<modifier>calldata|indexed|memory|storage{1}))?(?:\s(?<name>[a-zA-Z$_][a-zA-Z0-9$_]*))?$/;
+  dynamicIntegerRegex = /^u?int$/;
+  protectedKeywordsRegex = /^(?:after|alias|anonymous|apply|auto|byte|calldata|case|catch|constant|copyof|default|defined|error|event|external|false|final|function|immutable|implements|in|indexed|inline|internal|let|mapping|match|memory|mutable|null|of|override|partial|private|promise|public|pure|reference|relocatable|return|returns|sizeof|static|storage|struct|super|supports|switch|this|true|try|typedef|typeof|var|view|virtual)$/;
+});
+function parseStructs(signatures) {
+  const shallowStructs = {};
+  const signaturesLength = signatures.length;
+  for (let i2 = 0;i2 < signaturesLength; i2++) {
+    const signature = signatures[i2];
+    if (!isStructSignature(signature))
+      continue;
+    const match = execStructSignature(signature);
+    if (!match)
+      throw new InvalidSignatureError({ signature, type: "struct" });
+    const properties = match.properties.split(";");
+    const components = [];
+    const propertiesLength = properties.length;
+    for (let k = 0;k < propertiesLength; k++) {
+      const property = properties[k];
+      const trimmed = property.trim();
+      if (!trimmed)
+        continue;
+      const abiParameter = parseAbiParameter(trimmed, {
+        type: "struct"
+      });
+      components.push(abiParameter);
+    }
+    if (!components.length)
+      throw new InvalidStructSignatureError({ signature });
+    shallowStructs[match.name] = components;
+  }
+  const resolvedStructs = {};
+  const entries = Object.entries(shallowStructs);
+  const entriesLength = entries.length;
+  for (let i2 = 0;i2 < entriesLength; i2++) {
+    const [name, parameters] = entries[i2];
+    resolvedStructs[name] = resolveStructs(parameters, shallowStructs);
+  }
+  return resolvedStructs;
+}
+function resolveStructs(abiParameters, structs, ancestors = new Set) {
+  const components = [];
+  const length = abiParameters.length;
+  for (let i2 = 0;i2 < length; i2++) {
+    const abiParameter = abiParameters[i2];
+    const isTuple = isTupleRegex.test(abiParameter.type);
+    if (isTuple)
+      components.push(abiParameter);
+    else {
+      const match = execTyped(typeWithoutTupleRegex, abiParameter.type);
+      if (!match?.type)
+        throw new InvalidAbiTypeParameterError({ abiParameter });
+      const { array, type } = match;
+      if (type in structs) {
+        if (ancestors.has(type))
+          throw new CircularReferenceError({ type });
+        components.push({
+          ...abiParameter,
+          type: `tuple${array ?? ""}`,
+          components: resolveStructs(structs[type] ?? [], structs, new Set([...ancestors, type]))
+        });
+      } else {
+        if (isSolidityType(type))
+          components.push(abiParameter);
+        else
+          throw new UnknownTypeError({ type });
+      }
+    }
+  }
+  return components;
+}
+var typeWithoutTupleRegex;
+var init_structs = __esm(() => {
+  init_regex();
+  init_abiItem();
+  init_abiParameter();
+  init_signature();
+  init_struct();
+  init_signatures();
+  init_utils();
+  typeWithoutTupleRegex = /^(?<type>[a-zA-Z$_][a-zA-Z0-9$_]*)(?<array>(?:\[\d*?\])+?)?$/;
+});
+function parseAbiParameters(params) {
+  const abiParameters = [];
+  if (typeof params === "string") {
+    const parameters = splitParameters(params);
+    const length = parameters.length;
+    for (let i2 = 0;i2 < length; i2++) {
+      abiParameters.push(parseAbiParameter(parameters[i2], { modifiers }));
+    }
+  } else {
+    const structs = parseStructs(params);
+    const length = params.length;
+    for (let i2 = 0;i2 < length; i2++) {
+      const signature = params[i2];
+      if (isStructSignature(signature))
+        continue;
+      const parameters = splitParameters(signature);
+      const length2 = parameters.length;
+      for (let k = 0;k < length2; k++) {
+        abiParameters.push(parseAbiParameter(parameters[k], { modifiers, structs }));
+      }
+    }
+  }
+  if (abiParameters.length === 0)
+    throw new InvalidAbiParametersError({ params });
+  return abiParameters;
+}
+var init_parseAbiParameters = __esm(() => {
+  init_abiParameter();
+  init_signatures();
+  init_structs();
+  init_utils();
+  init_utils();
+});
 var init_exports = __esm(() => {
   init_formatAbiItem();
+  init_parseAbiParameters();
 });
 function formatAbiItem2(abiItem, { includeName = false } = {}) {
   if (abiItem.type !== "function" && abiItem.type !== "event" && abiItem.type !== "error")
@@ -109,7 +686,7 @@ function size(value2) {
   return value2.length;
 }
 var init_size = () => {};
-var version = "2.34.0";
+var version2 = "2.34.0";
 function walk(err, fn) {
   if (fn?.(err))
     return err;
@@ -118,23 +695,23 @@ function walk(err, fn) {
   return fn ? null : err;
 }
 var errorConfig;
-var BaseError;
+var BaseError2;
 var init_base = __esm(() => {
   errorConfig = {
     getDocsUrl: ({ docsBaseUrl, docsPath = "", docsSlug }) => docsPath ? `${docsBaseUrl ?? "https://viem.sh"}${docsPath}${docsSlug ? `#${docsSlug}` : ""}` : undefined,
-    version: `viem@${version}`
+    version: `viem@${version2}`
   };
-  BaseError = class BaseError2 extends Error {
+  BaseError2 = class BaseError22 extends Error {
     constructor(shortMessage, args = {}) {
       const details = (() => {
-        if (args.cause instanceof BaseError2)
+        if (args.cause instanceof BaseError22)
           return args.cause.details;
         if (args.cause?.message)
           return args.cause.message;
         return args.details;
       })();
       const docsPath = (() => {
-        if (args.cause instanceof BaseError2)
+        if (args.cause instanceof BaseError22)
           return args.cause.docsPath || args.docsPath;
         return args.docsPath;
       })();
@@ -190,26 +767,70 @@ var init_base = __esm(() => {
       this.metaMessages = args.metaMessages;
       this.name = args.name ?? this.name;
       this.shortMessage = shortMessage;
-      this.version = version;
+      this.version = version2;
     }
     walk(fn) {
       return walk(this, fn);
     }
   };
 });
+var AbiDecodingDataSizeTooSmallError;
+var AbiDecodingZeroDataError;
 var AbiEncodingArrayLengthMismatchError;
 var AbiEncodingBytesSizeMismatchError;
 var AbiEncodingLengthMismatchError;
 var AbiFunctionNotFoundError;
+var AbiFunctionOutputsNotFoundError;
 var AbiItemAmbiguityError;
 var InvalidAbiEncodingTypeError;
+var InvalidAbiDecodingTypeError;
 var InvalidArrayError;
 var InvalidDefinitionTypeError;
 var init_abi = __esm(() => {
   init_formatAbiItem2();
   init_size();
   init_base();
-  AbiEncodingArrayLengthMismatchError = class AbiEncodingArrayLengthMismatchError2 extends BaseError {
+  AbiDecodingDataSizeTooSmallError = class AbiDecodingDataSizeTooSmallError2 extends BaseError2 {
+    constructor({ data, params, size: size2 }) {
+      super([`Data size of ${size2} bytes is too small for given parameters.`].join(`
+`), {
+        metaMessages: [
+          `Params: (${formatAbiParams(params, { includeName: true })})`,
+          `Data:   ${data} (${size2} bytes)`
+        ],
+        name: "AbiDecodingDataSizeTooSmallError"
+      });
+      Object.defineProperty(this, "data", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      Object.defineProperty(this, "params", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      Object.defineProperty(this, "size", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      this.data = data;
+      this.params = params;
+      this.size = size2;
+    }
+  };
+  AbiDecodingZeroDataError = class AbiDecodingZeroDataError2 extends BaseError2 {
+    constructor() {
+      super('Cannot decode zero data ("0x") with ABI parameters.', {
+        name: "AbiDecodingZeroDataError"
+      });
+    }
+  };
+  AbiEncodingArrayLengthMismatchError = class AbiEncodingArrayLengthMismatchError2 extends BaseError2 {
     constructor({ expectedLength, givenLength, type }) {
       super([
         `ABI encoding array length mismatch for type ${type}.`,
@@ -219,12 +840,12 @@ var init_abi = __esm(() => {
 `), { name: "AbiEncodingArrayLengthMismatchError" });
     }
   };
-  AbiEncodingBytesSizeMismatchError = class AbiEncodingBytesSizeMismatchError2 extends BaseError {
+  AbiEncodingBytesSizeMismatchError = class AbiEncodingBytesSizeMismatchError2 extends BaseError2 {
     constructor({ expectedSize, value: value2 }) {
       super(`Size of bytes "${value2}" (bytes${size(value2)}) does not match expected size (bytes${expectedSize}).`, { name: "AbiEncodingBytesSizeMismatchError" });
     }
   };
-  AbiEncodingLengthMismatchError = class AbiEncodingLengthMismatchError2 extends BaseError {
+  AbiEncodingLengthMismatchError = class AbiEncodingLengthMismatchError2 extends BaseError2 {
     constructor({ expectedLength, givenLength }) {
       super([
         "ABI encoding params/values length mismatch.",
@@ -234,7 +855,7 @@ var init_abi = __esm(() => {
 `), { name: "AbiEncodingLengthMismatchError" });
     }
   };
-  AbiFunctionNotFoundError = class AbiFunctionNotFoundError2 extends BaseError {
+  AbiFunctionNotFoundError = class AbiFunctionNotFoundError2 extends BaseError2 {
     constructor(functionName, { docsPath } = {}) {
       super([
         `Function ${functionName ? `"${functionName}" ` : ""}not found on ABI.`,
@@ -246,7 +867,20 @@ var init_abi = __esm(() => {
       });
     }
   };
-  AbiItemAmbiguityError = class AbiItemAmbiguityError2 extends BaseError {
+  AbiFunctionOutputsNotFoundError = class AbiFunctionOutputsNotFoundError2 extends BaseError2 {
+    constructor(functionName, { docsPath }) {
+      super([
+        `Function "${functionName}" does not contain any \`outputs\` on ABI.`,
+        "Cannot decode function result without knowing what the parameter types are.",
+        "Make sure you are using the correct ABI and that the function exists on it."
+      ].join(`
+`), {
+        docsPath,
+        name: "AbiFunctionOutputsNotFoundError"
+      });
+    }
+  };
+  AbiItemAmbiguityError = class AbiItemAmbiguityError2 extends BaseError2 {
     constructor(x, y) {
       super("Found ambiguous types in overloaded ABI items.", {
         metaMessages: [
@@ -260,7 +894,7 @@ var init_abi = __esm(() => {
       });
     }
   };
-  InvalidAbiEncodingTypeError = class InvalidAbiEncodingTypeError2 extends BaseError {
+  InvalidAbiEncodingTypeError = class InvalidAbiEncodingTypeError2 extends BaseError2 {
     constructor(type, { docsPath }) {
       super([
         `Type "${type}" is not a valid encoding type.`,
@@ -269,7 +903,16 @@ var init_abi = __esm(() => {
 `), { docsPath, name: "InvalidAbiEncodingType" });
     }
   };
-  InvalidArrayError = class InvalidArrayError2 extends BaseError {
+  InvalidAbiDecodingTypeError = class InvalidAbiDecodingTypeError2 extends BaseError2 {
+    constructor(type, { docsPath }) {
+      super([
+        `Type "${type}" is not a valid decoding type.`,
+        "Please provide a valid ABI type."
+      ].join(`
+`), { docsPath, name: "InvalidAbiDecodingType" });
+    }
+  };
+  InvalidArrayError = class InvalidArrayError2 extends BaseError2 {
     constructor(value2) {
       super([`Value "${value2}" is not a valid array.`].join(`
 `), {
@@ -277,7 +920,7 @@ var init_abi = __esm(() => {
       });
     }
   };
-  InvalidDefinitionTypeError = class InvalidDefinitionTypeError2 extends BaseError {
+  InvalidDefinitionTypeError = class InvalidDefinitionTypeError2 extends BaseError2 {
     constructor(type) {
       super([
         `"${type}" is not a valid definition type.`,
@@ -291,12 +934,12 @@ var SliceOffsetOutOfBoundsError;
 var SizeExceedsPaddingSizeError;
 var init_data = __esm(() => {
   init_base();
-  SliceOffsetOutOfBoundsError = class SliceOffsetOutOfBoundsError2 extends BaseError {
+  SliceOffsetOutOfBoundsError = class SliceOffsetOutOfBoundsError2 extends BaseError2 {
     constructor({ offset, position, size: size2 }) {
       super(`Slice ${position === "start" ? "starting" : "ending"} at offset "${offset}" is out-of-bounds (size: ${size2}).`, { name: "SliceOffsetOutOfBoundsError" });
     }
   };
-  SizeExceedsPaddingSizeError = class SizeExceedsPaddingSizeError2 extends BaseError {
+  SizeExceedsPaddingSizeError = class SizeExceedsPaddingSizeError2 extends BaseError2 {
     constructor({ size: size2, targetSize, type }) {
       super(`${type.charAt(0).toUpperCase()}${type.slice(1).toLowerCase()} size (${size2}) exceeds padding size (${targetSize}).`, { name: "SizeExceedsPaddingSizeError" });
     }
@@ -339,26 +982,67 @@ var init_pad = __esm(() => {
   init_data();
 });
 var IntegerOutOfRangeError;
+var InvalidBytesBooleanError;
 var SizeOverflowError;
 var init_encoding = __esm(() => {
   init_base();
-  IntegerOutOfRangeError = class IntegerOutOfRangeError2 extends BaseError {
+  IntegerOutOfRangeError = class IntegerOutOfRangeError2 extends BaseError2 {
     constructor({ max, min, signed, size: size2, value: value2 }) {
       super(`Number "${value2}" is not in safe ${size2 ? `${size2 * 8}-bit ${signed ? "signed" : "unsigned"} ` : ""}integer range ${max ? `(${min} to ${max})` : `(above ${min})`}`, { name: "IntegerOutOfRangeError" });
     }
   };
-  SizeOverflowError = class SizeOverflowError2 extends BaseError {
+  InvalidBytesBooleanError = class InvalidBytesBooleanError2 extends BaseError2 {
+    constructor(bytes) {
+      super(`Bytes value "${bytes}" is not a valid boolean. The bytes array must contain a single byte of either a 0 or 1 value.`, {
+        name: "InvalidBytesBooleanError"
+      });
+    }
+  };
+  SizeOverflowError = class SizeOverflowError2 extends BaseError2 {
     constructor({ givenSize, maxSize }) {
       super(`Size cannot exceed ${maxSize} bytes. Given size: ${givenSize} bytes.`, { name: "SizeOverflowError" });
     }
   };
 });
+function trim(hexOrBytes, { dir = "left" } = {}) {
+  let data = typeof hexOrBytes === "string" ? hexOrBytes.replace("0x", "") : hexOrBytes;
+  let sliceLength = 0;
+  for (let i2 = 0;i2 < data.length - 1; i2++) {
+    if (data[dir === "left" ? i2 : data.length - i2 - 1].toString() === "0")
+      sliceLength++;
+    else
+      break;
+  }
+  data = dir === "left" ? data.slice(sliceLength) : data.slice(0, data.length - sliceLength);
+  if (typeof hexOrBytes === "string") {
+    if (data.length === 1 && dir === "right")
+      data = `${data}0`;
+    return `0x${data.length % 2 === 1 ? `0${data}` : data}`;
+  }
+  return data;
+}
 function assertSize2(hexOrBytes, { size: size2 }) {
   if (size(hexOrBytes) > size2)
     throw new SizeOverflowError({
       givenSize: size(hexOrBytes),
       maxSize: size2
     });
+}
+function hexToBigInt(hex, opts = {}) {
+  const { signed } = opts;
+  if (opts.size)
+    assertSize2(hex, { size: opts.size });
+  const value2 = BigInt(hex);
+  if (!signed)
+    return value2;
+  const size2 = (hex.length - 2) / 2;
+  const max = (1n << BigInt(size2) * 8n - 1n) - 1n;
+  if (value2 <= max)
+    return value2;
+  return value2 - BigInt(`0x${"f".padStart(size2 * 2, "f")}`) - 1n;
+}
+function hexToNumber(hex, opts = {}) {
+  return Number(hexToBigInt(hex, opts));
 }
 var init_fromHex = __esm(() => {
   init_encoding();
@@ -477,7 +1161,7 @@ function hexToBytes2(hex_, opts = {}) {
     const nibbleLeft = charCodeToBase16(hexString.charCodeAt(j++));
     const nibbleRight = charCodeToBase16(hexString.charCodeAt(j++));
     if (nibbleLeft === undefined || nibbleRight === undefined) {
-      throw new BaseError(`Invalid byte sequence ("${hexString[j - 2]}${hexString[j - 1]}" in "${hexString}").`);
+      throw new BaseError2(`Invalid byte sequence ("${hexString[j - 2]}${hexString[j - 1]}" in "${hexString}").`);
     }
     bytes[index] = nibbleLeft * 16 + nibbleRight;
   }
@@ -604,7 +1288,7 @@ function createHasher(hashCons) {
 }
 var isLE;
 var swap32IfBE;
-var init_utils = __esm(() => {
+var init_utils2 = __esm(() => {
   /*! noble-hashes - MIT License (c) 2022 Paul Miller (paulmillr.com) */
   isLE = /* @__PURE__ */ (() => new Uint8Array(new Uint32Array([287454020]).buffer)[0] === 68)();
   swap32IfBE = isLE ? (u) => u : byteSwap32;
@@ -668,7 +1352,7 @@ var gen = (suffix, blockLen, outputLen) => createHasher(() => new Keccak(blockLe
 var keccak_256;
 var init_sha3 = __esm(() => {
   init__u64();
-  init_utils();
+  init_utils2();
   _0n = BigInt(0);
   _1n = BigInt(1);
   _2n = BigInt(2);
@@ -864,7 +1548,7 @@ function normalizeSignature(signature) {
     current += char;
   }
   if (!valid)
-    throw new BaseError("Unable to normalize signature.");
+    throw new BaseError2("Unable to normalize signature.");
   return result;
 }
 var init_normalizeSignature = __esm(() => {
@@ -897,7 +1581,7 @@ var init_toEventSelector = __esm(() => {
 var InvalidAddressError;
 var init_address = __esm(() => {
   init_base();
-  InvalidAddressError = class InvalidAddressError2 extends BaseError {
+  InvalidAddressError = class InvalidAddressError2 extends BaseError2 {
     constructor({ address }) {
       super(`Address "${address}" is invalid.`, {
         metaMessages: [
@@ -1056,9 +1740,9 @@ var init_slice = __esm(() => {
   init_data();
   init_size();
 });
-var integerRegex;
+var integerRegex2;
 var init_regex2 = __esm(() => {
-  integerRegex = /^(u?int)(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)?$/;
+  integerRegex2 = /^(u?int)(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)?$/;
 });
 function encodeAbiParameters(params, values) {
   if (params.length !== values.length)
@@ -1101,7 +1785,7 @@ function prepareParam({ param, value: value2 }) {
   }
   if (param.type.startsWith("uint") || param.type.startsWith("int")) {
     const signed = param.type.startsWith("int");
-    const [, , size2 = "256"] = integerRegex.exec(param.type) ?? [];
+    const [, , size2 = "256"] = integerRegex2.exec(param.type) ?? [];
     return encodeNumber(value2, {
       signed,
       size: Number(size2)
@@ -1205,7 +1889,7 @@ function encodeBytes(value2, { param }) {
 }
 function encodeBool(value2) {
   if (typeof value2 !== "boolean")
-    throw new BaseError(`Invalid boolean value: "${value2}" (type: ${typeof value2}). Expected: \`true\` or \`false\`.`);
+    throw new BaseError2(`Invalid boolean value: "${value2}" (type: ${typeof value2}). Expected: \`true\` or \`false\`.`);
   return { dynamic: false, encoded: padHex(boolToHex(value2)) };
 }
 function encodeNumber(value2, { signed, size: size2 = 256 }) {
@@ -1443,6 +2127,457 @@ function encodeFunctionData(parameters) {
 var init_encodeFunctionData = __esm(() => {
   init_encodeAbiParameters();
   init_prepareEncodeFunctionData();
+});
+var NegativeOffsetError;
+var PositionOutOfBoundsError;
+var RecursiveReadLimitExceededError;
+var init_cursor = __esm(() => {
+  init_base();
+  NegativeOffsetError = class NegativeOffsetError2 extends BaseError2 {
+    constructor({ offset }) {
+      super(`Offset \`${offset}\` cannot be negative.`, {
+        name: "NegativeOffsetError"
+      });
+    }
+  };
+  PositionOutOfBoundsError = class PositionOutOfBoundsError2 extends BaseError2 {
+    constructor({ length, position }) {
+      super(`Position \`${position}\` is out of bounds (\`0 < position < ${length}\`).`, { name: "PositionOutOfBoundsError" });
+    }
+  };
+  RecursiveReadLimitExceededError = class RecursiveReadLimitExceededError2 extends BaseError2 {
+    constructor({ count, limit }) {
+      super(`Recursive read limit of \`${limit}\` exceeded (recursive read count: \`${count}\`).`, { name: "RecursiveReadLimitExceededError" });
+    }
+  };
+});
+function createCursor(bytes, { recursiveReadLimit = 8192 } = {}) {
+  const cursor = Object.create(staticCursor);
+  cursor.bytes = bytes;
+  cursor.dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  cursor.positionReadCount = new Map;
+  cursor.recursiveReadLimit = recursiveReadLimit;
+  return cursor;
+}
+var staticCursor;
+var init_cursor2 = __esm(() => {
+  init_cursor();
+  staticCursor = {
+    bytes: new Uint8Array,
+    dataView: new DataView(new ArrayBuffer(0)),
+    position: 0,
+    positionReadCount: new Map,
+    recursiveReadCount: 0,
+    recursiveReadLimit: Number.POSITIVE_INFINITY,
+    assertReadLimit() {
+      if (this.recursiveReadCount >= this.recursiveReadLimit)
+        throw new RecursiveReadLimitExceededError({
+          count: this.recursiveReadCount + 1,
+          limit: this.recursiveReadLimit
+        });
+    },
+    assertPosition(position) {
+      if (position < 0 || position > this.bytes.length - 1)
+        throw new PositionOutOfBoundsError({
+          length: this.bytes.length,
+          position
+        });
+    },
+    decrementPosition(offset) {
+      if (offset < 0)
+        throw new NegativeOffsetError({ offset });
+      const position = this.position - offset;
+      this.assertPosition(position);
+      this.position = position;
+    },
+    getReadCount(position) {
+      return this.positionReadCount.get(position || this.position) || 0;
+    },
+    incrementPosition(offset) {
+      if (offset < 0)
+        throw new NegativeOffsetError({ offset });
+      const position = this.position + offset;
+      this.assertPosition(position);
+      this.position = position;
+    },
+    inspectByte(position_) {
+      const position = position_ ?? this.position;
+      this.assertPosition(position);
+      return this.bytes[position];
+    },
+    inspectBytes(length, position_) {
+      const position = position_ ?? this.position;
+      this.assertPosition(position + length - 1);
+      return this.bytes.subarray(position, position + length);
+    },
+    inspectUint8(position_) {
+      const position = position_ ?? this.position;
+      this.assertPosition(position);
+      return this.bytes[position];
+    },
+    inspectUint16(position_) {
+      const position = position_ ?? this.position;
+      this.assertPosition(position + 1);
+      return this.dataView.getUint16(position);
+    },
+    inspectUint24(position_) {
+      const position = position_ ?? this.position;
+      this.assertPosition(position + 2);
+      return (this.dataView.getUint16(position) << 8) + this.dataView.getUint8(position + 2);
+    },
+    inspectUint32(position_) {
+      const position = position_ ?? this.position;
+      this.assertPosition(position + 3);
+      return this.dataView.getUint32(position);
+    },
+    pushByte(byte) {
+      this.assertPosition(this.position);
+      this.bytes[this.position] = byte;
+      this.position++;
+    },
+    pushBytes(bytes) {
+      this.assertPosition(this.position + bytes.length - 1);
+      this.bytes.set(bytes, this.position);
+      this.position += bytes.length;
+    },
+    pushUint8(value2) {
+      this.assertPosition(this.position);
+      this.bytes[this.position] = value2;
+      this.position++;
+    },
+    pushUint16(value2) {
+      this.assertPosition(this.position + 1);
+      this.dataView.setUint16(this.position, value2);
+      this.position += 2;
+    },
+    pushUint24(value2) {
+      this.assertPosition(this.position + 2);
+      this.dataView.setUint16(this.position, value2 >> 8);
+      this.dataView.setUint8(this.position + 2, value2 & ~4294967040);
+      this.position += 3;
+    },
+    pushUint32(value2) {
+      this.assertPosition(this.position + 3);
+      this.dataView.setUint32(this.position, value2);
+      this.position += 4;
+    },
+    readByte() {
+      this.assertReadLimit();
+      this._touch();
+      const value2 = this.inspectByte();
+      this.position++;
+      return value2;
+    },
+    readBytes(length, size2) {
+      this.assertReadLimit();
+      this._touch();
+      const value2 = this.inspectBytes(length);
+      this.position += size2 ?? length;
+      return value2;
+    },
+    readUint8() {
+      this.assertReadLimit();
+      this._touch();
+      const value2 = this.inspectUint8();
+      this.position += 1;
+      return value2;
+    },
+    readUint16() {
+      this.assertReadLimit();
+      this._touch();
+      const value2 = this.inspectUint16();
+      this.position += 2;
+      return value2;
+    },
+    readUint24() {
+      this.assertReadLimit();
+      this._touch();
+      const value2 = this.inspectUint24();
+      this.position += 3;
+      return value2;
+    },
+    readUint32() {
+      this.assertReadLimit();
+      this._touch();
+      const value2 = this.inspectUint32();
+      this.position += 4;
+      return value2;
+    },
+    get remaining() {
+      return this.bytes.length - this.position;
+    },
+    setPosition(position) {
+      const oldPosition = this.position;
+      this.assertPosition(position);
+      this.position = position;
+      return () => this.position = oldPosition;
+    },
+    _touch() {
+      if (this.recursiveReadLimit === Number.POSITIVE_INFINITY)
+        return;
+      const count = this.getReadCount();
+      this.positionReadCount.set(this.position, count + 1);
+      if (count > 0)
+        this.recursiveReadCount++;
+    }
+  };
+});
+function bytesToBigInt(bytes, opts = {}) {
+  if (typeof opts.size !== "undefined")
+    assertSize2(bytes, { size: opts.size });
+  const hex = bytesToHex2(bytes, opts);
+  return hexToBigInt(hex, opts);
+}
+function bytesToBool(bytes_, opts = {}) {
+  let bytes = bytes_;
+  if (typeof opts.size !== "undefined") {
+    assertSize2(bytes, { size: opts.size });
+    bytes = trim(bytes);
+  }
+  if (bytes.length > 1 || bytes[0] > 1)
+    throw new InvalidBytesBooleanError(bytes);
+  return Boolean(bytes[0]);
+}
+function bytesToNumber(bytes, opts = {}) {
+  if (typeof opts.size !== "undefined")
+    assertSize2(bytes, { size: opts.size });
+  const hex = bytesToHex2(bytes, opts);
+  return hexToNumber(hex, opts);
+}
+function bytesToString(bytes_, opts = {}) {
+  let bytes = bytes_;
+  if (typeof opts.size !== "undefined") {
+    assertSize2(bytes, { size: opts.size });
+    bytes = trim(bytes, { dir: "right" });
+  }
+  return new TextDecoder().decode(bytes);
+}
+var init_fromBytes = __esm(() => {
+  init_encoding();
+  init_fromHex();
+  init_toHex();
+});
+function decodeAbiParameters(params, data) {
+  const bytes = typeof data === "string" ? hexToBytes2(data) : data;
+  const cursor = createCursor(bytes);
+  if (size(bytes) === 0 && params.length > 0)
+    throw new AbiDecodingZeroDataError;
+  if (size(data) && size(data) < 32)
+    throw new AbiDecodingDataSizeTooSmallError({
+      data: typeof data === "string" ? data : bytesToHex2(data),
+      params,
+      size: size(data)
+    });
+  let consumed = 0;
+  const values = [];
+  for (let i2 = 0;i2 < params.length; ++i2) {
+    const param = params[i2];
+    cursor.setPosition(consumed);
+    const [data2, consumed_] = decodeParameter(cursor, param, {
+      staticPosition: 0
+    });
+    consumed += consumed_;
+    values.push(data2);
+  }
+  return values;
+}
+function decodeParameter(cursor, param, { staticPosition }) {
+  const arrayComponents = getArrayComponents(param.type);
+  if (arrayComponents) {
+    const [length, type] = arrayComponents;
+    return decodeArray(cursor, { ...param, type }, { length, staticPosition });
+  }
+  if (param.type === "tuple")
+    return decodeTuple(cursor, param, { staticPosition });
+  if (param.type === "address")
+    return decodeAddress(cursor);
+  if (param.type === "bool")
+    return decodeBool(cursor);
+  if (param.type.startsWith("bytes"))
+    return decodeBytes(cursor, param, { staticPosition });
+  if (param.type.startsWith("uint") || param.type.startsWith("int"))
+    return decodeNumber(cursor, param);
+  if (param.type === "string")
+    return decodeString(cursor, { staticPosition });
+  throw new InvalidAbiDecodingTypeError(param.type, {
+    docsPath: "/docs/contract/decodeAbiParameters"
+  });
+}
+function decodeAddress(cursor) {
+  const value2 = cursor.readBytes(32);
+  return [checksumAddress(bytesToHex2(sliceBytes(value2, -20))), 32];
+}
+function decodeArray(cursor, param, { length, staticPosition }) {
+  if (!length) {
+    const offset = bytesToNumber(cursor.readBytes(sizeOfOffset));
+    const start = staticPosition + offset;
+    const startOfData = start + sizeOfLength;
+    cursor.setPosition(start);
+    const length2 = bytesToNumber(cursor.readBytes(sizeOfLength));
+    const dynamicChild = hasDynamicChild(param);
+    let consumed2 = 0;
+    const value3 = [];
+    for (let i2 = 0;i2 < length2; ++i2) {
+      cursor.setPosition(startOfData + (dynamicChild ? i2 * 32 : consumed2));
+      const [data, consumed_] = decodeParameter(cursor, param, {
+        staticPosition: startOfData
+      });
+      consumed2 += consumed_;
+      value3.push(data);
+    }
+    cursor.setPosition(staticPosition + 32);
+    return [value3, 32];
+  }
+  if (hasDynamicChild(param)) {
+    const offset = bytesToNumber(cursor.readBytes(sizeOfOffset));
+    const start = staticPosition + offset;
+    const value3 = [];
+    for (let i2 = 0;i2 < length; ++i2) {
+      cursor.setPosition(start + i2 * 32);
+      const [data] = decodeParameter(cursor, param, {
+        staticPosition: start
+      });
+      value3.push(data);
+    }
+    cursor.setPosition(staticPosition + 32);
+    return [value3, 32];
+  }
+  let consumed = 0;
+  const value2 = [];
+  for (let i2 = 0;i2 < length; ++i2) {
+    const [data, consumed_] = decodeParameter(cursor, param, {
+      staticPosition: staticPosition + consumed
+    });
+    consumed += consumed_;
+    value2.push(data);
+  }
+  return [value2, consumed];
+}
+function decodeBool(cursor) {
+  return [bytesToBool(cursor.readBytes(32), { size: 32 }), 32];
+}
+function decodeBytes(cursor, param, { staticPosition }) {
+  const [_, size2] = param.type.split("bytes");
+  if (!size2) {
+    const offset = bytesToNumber(cursor.readBytes(32));
+    cursor.setPosition(staticPosition + offset);
+    const length = bytesToNumber(cursor.readBytes(32));
+    if (length === 0) {
+      cursor.setPosition(staticPosition + 32);
+      return ["0x", 32];
+    }
+    const data = cursor.readBytes(length);
+    cursor.setPosition(staticPosition + 32);
+    return [bytesToHex2(data), 32];
+  }
+  const value2 = bytesToHex2(cursor.readBytes(Number.parseInt(size2), 32));
+  return [value2, 32];
+}
+function decodeNumber(cursor, param) {
+  const signed = param.type.startsWith("int");
+  const size2 = Number.parseInt(param.type.split("int")[1] || "256");
+  const value2 = cursor.readBytes(32);
+  return [
+    size2 > 48 ? bytesToBigInt(value2, { signed }) : bytesToNumber(value2, { signed }),
+    32
+  ];
+}
+function decodeTuple(cursor, param, { staticPosition }) {
+  const hasUnnamedChild = param.components.length === 0 || param.components.some(({ name }) => !name);
+  const value2 = hasUnnamedChild ? [] : {};
+  let consumed = 0;
+  if (hasDynamicChild(param)) {
+    const offset = bytesToNumber(cursor.readBytes(sizeOfOffset));
+    const start = staticPosition + offset;
+    for (let i2 = 0;i2 < param.components.length; ++i2) {
+      const component = param.components[i2];
+      cursor.setPosition(start + consumed);
+      const [data, consumed_] = decodeParameter(cursor, component, {
+        staticPosition: start
+      });
+      consumed += consumed_;
+      value2[hasUnnamedChild ? i2 : component?.name] = data;
+    }
+    cursor.setPosition(staticPosition + 32);
+    return [value2, 32];
+  }
+  for (let i2 = 0;i2 < param.components.length; ++i2) {
+    const component = param.components[i2];
+    const [data, consumed_] = decodeParameter(cursor, component, {
+      staticPosition
+    });
+    value2[hasUnnamedChild ? i2 : component?.name] = data;
+    consumed += consumed_;
+  }
+  return [value2, consumed];
+}
+function decodeString(cursor, { staticPosition }) {
+  const offset = bytesToNumber(cursor.readBytes(32));
+  const start = staticPosition + offset;
+  cursor.setPosition(start);
+  const length = bytesToNumber(cursor.readBytes(32));
+  if (length === 0) {
+    cursor.setPosition(staticPosition + 32);
+    return ["", 32];
+  }
+  const data = cursor.readBytes(length, 32);
+  const value2 = bytesToString(trim(data));
+  cursor.setPosition(staticPosition + 32);
+  return [value2, 32];
+}
+function hasDynamicChild(param) {
+  const { type } = param;
+  if (type === "string")
+    return true;
+  if (type === "bytes")
+    return true;
+  if (type.endsWith("[]"))
+    return true;
+  if (type === "tuple")
+    return param.components?.some(hasDynamicChild);
+  const arrayComponents = getArrayComponents(param.type);
+  if (arrayComponents && hasDynamicChild({ ...param, type: arrayComponents[1] }))
+    return true;
+  return false;
+}
+var sizeOfLength = 32;
+var sizeOfOffset = 32;
+var init_decodeAbiParameters = __esm(() => {
+  init_abi();
+  init_getAddress();
+  init_cursor2();
+  init_size();
+  init_slice();
+  init_fromBytes();
+  init_toBytes();
+  init_toHex();
+  init_encodeAbiParameters();
+});
+function decodeFunctionResult(parameters) {
+  const { abi, args, functionName, data } = parameters;
+  let abiItem = abi[0];
+  if (functionName) {
+    const item = getAbiItem({ abi, args, name: functionName });
+    if (!item)
+      throw new AbiFunctionNotFoundError(functionName, { docsPath: docsPath2 });
+    abiItem = item;
+  }
+  if (abiItem.type !== "function")
+    throw new AbiFunctionNotFoundError(undefined, { docsPath: docsPath2 });
+  if (!abiItem.outputs)
+    throw new AbiFunctionOutputsNotFoundError(abiItem.name, { docsPath: docsPath2 });
+  const values = decodeAbiParameters(abiItem.outputs, data);
+  if (values && values.length > 1)
+    return values;
+  if (values && values.length === 1)
+    return values[0];
+  return;
+}
+var docsPath2 = "/docs/contract/decodeFunctionResult";
+var init_decodeFunctionResult = __esm(() => {
+  init_abi();
+  init_decodeAbiParameters();
+  init_getAbiItem();
 });
 function isMessage(arg, schema) {
   const isMessage2 = arg !== null && typeof arg == "object" && "$typeName" in arg && typeof arg.$typeName == "string";
@@ -5635,33 +6770,33 @@ class ClientCapability2 {
     return runtime.runInNodeMode(wrappedFn, consensusAggregation, unwrapOptions);
   }
 }
-var file_capabilities_networking_http_v1alpha_trigger = /* @__PURE__ */ fileDesc("CjJjYXBhYmlsaXRpZXMvbmV0d29ya2luZy9odHRwL3YxYWxwaGEvdHJpZ2dlci5wcm90bxIkY2FwYWJpbGl0aWVzLm5ldHdvcmtpbmcuaHR0cC52MWFscGhhIlYKBkNvbmZpZxJMCg9hdXRob3JpemVkX2tleXMYASADKAsyMy5jYXBhYmlsaXRpZXMubmV0d29ya2luZy5odHRwLnYxYWxwaGEuQXV0aG9yaXplZEtleSJaCgdQYXlsb2FkEg0KBWlucHV0GAEgASgMEkAKA2tleRgCIAEoCzIzLmNhcGFiaWxpdGllcy5uZXR3b3JraW5nLmh0dHAudjFhbHBoYS5BdXRob3JpemVkS2V5ImAKDUF1dGhvcml6ZWRLZXkSOwoEdHlwZRgBIAEoDjItLmNhcGFiaWxpdGllcy5uZXR3b3JraW5nLmh0dHAudjFhbHBoYS5LZXlUeXBlEhIKCnB1YmxpY19rZXkYAiABKAkqOwoHS2V5VHlwZRIYChRLRVlfVFlQRV9VTlNQRUNJRklFRBAAEhYKEktFWV9UWVBFX0VDRFNBX0VWTRABMpIBCgRIVFRQEmgKB1RyaWdnZXISLC5jYXBhYmlsaXRpZXMubmV0d29ya2luZy5odHRwLnYxYWxwaGEuQ29uZmlnGi0uY2FwYWJpbGl0aWVzLm5ldHdvcmtpbmcuaHR0cC52MWFscGhhLlBheWxvYWQwARoggrUYHAgBEhhodHRwLXRyaWdnZXJAMS4wLjAtYWxwaGFC6wEKKGNvbS5jYXBhYmlsaXRpZXMubmV0d29ya2luZy5odHRwLnYxYWxwaGFCDFRyaWdnZXJQcm90b1ABogIDQ05IqgIkQ2FwYWJpbGl0aWVzLk5ldHdvcmtpbmcuSHR0cC5WMWFscGhhygIkQ2FwYWJpbGl0aWVzXE5ldHdvcmtpbmdcSHR0cFxWMWFscGhh4gIwQ2FwYWJpbGl0aWVzXE5ldHdvcmtpbmdcSHR0cFxWMWFscGhhXEdQQk1ldGFkYXRh6gInQ2FwYWJpbGl0aWVzOjpOZXR3b3JraW5nOjpIdHRwOjpWMWFscGhhYgZwcm90bzM", [file_tools_generator_v1alpha_cre_metadata]);
-var ConfigSchema = /* @__PURE__ */ messageDesc(file_capabilities_networking_http_v1alpha_trigger, 0);
-var PayloadSchema = /* @__PURE__ */ messageDesc(file_capabilities_networking_http_v1alpha_trigger, 1);
 var KeyType;
 (function(KeyType2) {
   KeyType2[KeyType2["UNSPECIFIED"] = 0] = "UNSPECIFIED";
   KeyType2[KeyType2["ECDSA_EVM"] = 1] = "ECDSA_EVM";
 })(KeyType || (KeyType = {}));
+var file_capabilities_scheduler_cron_v1_trigger = /* @__PURE__ */ fileDesc("CixjYXBhYmlsaXRpZXMvc2NoZWR1bGVyL2Nyb24vdjEvdHJpZ2dlci5wcm90bxIeY2FwYWJpbGl0aWVzLnNjaGVkdWxlci5jcm9uLnYxIhoKBkNvbmZpZxIQCghzY2hlZHVsZRgBIAEoCSJHCgdQYXlsb2FkEjwKGHNjaGVkdWxlZF9leGVjdXRpb25fdGltZRgBIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiNQoNTGVnYWN5UGF5bG9hZBIgChhzY2hlZHVsZWRfZXhlY3V0aW9uX3RpbWUYASABKAk6AhgBMvUBCgRDcm9uElwKB1RyaWdnZXISJi5jYXBhYmlsaXRpZXMuc2NoZWR1bGVyLmNyb24udjEuQ29uZmlnGicuY2FwYWJpbGl0aWVzLnNjaGVkdWxlci5jcm9uLnYxLlBheWxvYWQwARJzCg1MZWdhY3lUcmlnZ2VyEiYuY2FwYWJpbGl0aWVzLnNjaGVkdWxlci5jcm9uLnYxLkNvbmZpZxotLmNhcGFiaWxpdGllcy5zY2hlZHVsZXIuY3Jvbi52MS5MZWdhY3lQYXlsb2FkIgmIAgGKtRgCCAEwARoagrUYFggBEhJjcm9uLXRyaWdnZXJAMS4wLjBCzQEKImNvbS5jYXBhYmlsaXRpZXMuc2NoZWR1bGVyLmNyb24udjFCDFRyaWdnZXJQcm90b1ABogIDQ1NDqgIeQ2FwYWJpbGl0aWVzLlNjaGVkdWxlci5Dcm9uLlYxygIeQ2FwYWJpbGl0aWVzXFNjaGVkdWxlclxDcm9uXFYx4gIqQ2FwYWJpbGl0aWVzXFNjaGVkdWxlclxDcm9uXFYxXEdQQk1ldGFkYXRh6gIhQ2FwYWJpbGl0aWVzOjpTY2hlZHVsZXI6OkNyb246OlYxYgZwcm90bzM", [file_google_protobuf_timestamp, file_tools_generator_v1alpha_cre_metadata]);
+var ConfigSchema2 = /* @__PURE__ */ messageDesc(file_capabilities_scheduler_cron_v1_trigger, 0);
+var PayloadSchema2 = /* @__PURE__ */ messageDesc(file_capabilities_scheduler_cron_v1_trigger, 1);
 
-class HTTPCapability {
-  static CAPABILITY_ID = "http-trigger@1.0.0-alpha";
-  static CAPABILITY_NAME = "http-trigger";
-  static CAPABILITY_VERSION = "1.0.0-alpha";
+class CronCapability {
+  static CAPABILITY_ID = "cron-trigger@1.0.0";
+  static CAPABILITY_NAME = "cron-trigger";
+  static CAPABILITY_VERSION = "1.0.0";
   trigger(config) {
-    const capabilityId = HTTPCapability.CAPABILITY_ID;
-    return new HTTPTrigger(config, capabilityId, "Trigger");
+    const capabilityId = CronCapability.CAPABILITY_ID;
+    return new CronTrigger(config, capabilityId, "Trigger");
   }
 }
 
-class HTTPTrigger {
+class CronTrigger {
   _capabilityId;
   _method;
   config;
   constructor(config, _capabilityId, _method) {
     this._capabilityId = _capabilityId;
     this._method = _method;
-    this.config = config.$typeName ? config : fromJson(ConfigSchema, config);
+    this.config = config.$typeName ? config : fromJson(ConfigSchema2, config);
   }
   capabilityId() {
     return this._capabilityId;
@@ -5670,10 +6805,10 @@ class HTTPTrigger {
     return this._method;
   }
   outputSchema() {
-    return PayloadSchema;
+    return PayloadSchema2;
   }
   configAsAny() {
-    return anyPack(ConfigSchema, this.config);
+    return anyPack(ConfigSchema2, this.config);
   }
   adapt(rawOutput) {
     return rawOutput;
@@ -7007,11 +8142,6 @@ var LAST_FINALIZED_BLOCK_NUMBER = {
 var LATEST_BLOCK_NUMBER = {
   absVal: Buffer.from([2]).toString("base64"),
   sign: "-1"
-};
-var decodeJson = (input) => {
-  const decoder = new TextDecoder("utf-8");
-  const textBody = decoder.decode(input);
-  return JSON.parse(textBody);
 };
 function ok(responseOrFn) {
   if (typeof responseOrFn === "function") {
@@ -11994,11 +13124,11 @@ function datetimeRegex(args) {
   regex = `${regex}(${opts.join("|")})`;
   return new RegExp(`^${regex}$`);
 }
-function isValidIP(ip, version2) {
-  if ((version2 === "v4" || !version2) && ipv4Regex.test(ip)) {
+function isValidIP(ip, version3) {
+  if ((version3 === "v4" || !version3) && ipv4Regex.test(ip)) {
     return true;
   }
-  if ((version2 === "v6" || !version2) && ipv6Regex.test(ip)) {
+  if ((version3 === "v6" || !version3) && ipv6Regex.test(ip)) {
     return true;
   }
   return false;
@@ -12025,11 +13155,11 @@ function isValidJWT(jwt, alg) {
     return false;
   }
 }
-function isValidCidr(ip, version2) {
-  if ((version2 === "v4" || !version2) && ipv4CidrRegex.test(ip)) {
+function isValidCidr(ip, version3) {
+  if ((version3 === "v4" || !version3) && ipv4CidrRegex.test(ip)) {
     return true;
   }
-  if ((version2 === "v6" || !version2) && ipv6CidrRegex.test(ip)) {
+  if ((version3 === "v6" || !version3) && ipv6CidrRegex.test(ip)) {
     return true;
   }
   return false;
@@ -15550,71 +16680,110 @@ var sendErrorResponse = (error) => {
   }
   hostBindings.sendResponse(payload);
 };
+init_exports();
+init_decodeFunctionResult();
+init_encodeAbiParameters();
 init_encodeFunctionData();
-init_toBytes();
-init_keccak256();
 var LoanRegistry_default = {
-  abi: [{ type: "constructor", inputs: [{ name: "authorizedWorkflow", type: "address", internalType: "address" }], stateMutability: "nonpayable" }, { type: "function", name: "DEFAULT_ADMIN_ROLE", inputs: [], outputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], stateMutability: "view" }, { type: "function", name: "WORKFLOW_ROLE", inputs: [], outputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], stateMutability: "view" }, { type: "function", name: "deactivateCovenant", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "covenantName", type: "string", internalType: "string" }], outputs: [], stateMutability: "nonpayable" }, { type: "function", name: "getCovenant", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "covenantName", type: "string", internalType: "string" }], outputs: [{ name: "name", type: "string", internalType: "string" }, { name: "metricDefinition", type: "string", internalType: "string" }, { name: "threshold", type: "uint256", internalType: "uint256" }, { name: "thresholdType", type: "string", internalType: "string" }, { name: "ebitdaAdjustments", type: "string", internalType: "string" }, { name: "isActive", type: "bool", internalType: "bool" }], stateMutability: "view" }, { type: "function", name: "getCovenantNames", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "string[]", internalType: "string[]" }], stateMutability: "view" }, { type: "function", name: "getLoanSchema", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "tokenAddress", type: "address", internalType: "address" }, { name: "principalAmount", type: "uint256", internalType: "uint256" }, { name: "onboardingTimestamp", type: "uint256", internalType: "uint256" }, { name: "reportingFrequency", type: "uint256", internalType: "uint256" }, { name: "covenantNames", type: "string[]", internalType: "string[]" }], stateMutability: "view" }, { type: "function", name: "getRegisteredLoanCount", inputs: [], outputs: [{ name: "", type: "uint256", internalType: "uint256" }], stateMutability: "view" }, { type: "function", name: "getRoleAdmin", inputs: [{ name: "role", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], stateMutability: "view" }, { type: "function", name: "grantRole", inputs: [{ name: "role", type: "bytes32", internalType: "bytes32" }, { name: "account", type: "address", internalType: "address" }], outputs: [], stateMutability: "nonpayable" }, { type: "function", name: "hasRole", inputs: [{ name: "role", type: "bytes32", internalType: "bytes32" }, { name: "account", type: "address", internalType: "address" }], outputs: [{ name: "", type: "bool", internalType: "bool" }], stateMutability: "view" }, { type: "function", name: "isLoanRegistered", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "bool", internalType: "bool" }], stateMutability: "view" }, { type: "function", name: "registerLoan", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "tokenAddress", type: "address", internalType: "address" }, { name: "principalAmount", type: "uint256", internalType: "uint256" }, { name: "reportingFrequency", type: "uint256", internalType: "uint256" }, { name: "covenantNames", type: "string[]", internalType: "string[]" }, { name: "metricDefinitions", type: "string[]", internalType: "string[]" }, { name: "thresholds", type: "uint256[]", internalType: "uint256[]" }, { name: "thresholdTypes", type: "string[]", internalType: "string[]" }, { name: "ebitdaAdjustments", type: "string[]", internalType: "string[]" }], outputs: [], stateMutability: "nonpayable" }, { type: "function", name: "registeredLoans", inputs: [{ name: "", type: "uint256", internalType: "uint256" }], outputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], stateMutability: "view" }, { type: "function", name: "renounceRole", inputs: [{ name: "role", type: "bytes32", internalType: "bytes32" }, { name: "callerConfirmation", type: "address", internalType: "address" }], outputs: [], stateMutability: "nonpayable" }, { type: "function", name: "revokeRole", inputs: [{ name: "role", type: "bytes32", internalType: "bytes32" }, { name: "account", type: "address", internalType: "address" }], outputs: [], stateMutability: "nonpayable" }, { type: "function", name: "supportsInterface", inputs: [{ name: "interfaceId", type: "bytes4", internalType: "bytes4" }], outputs: [{ name: "", type: "bool", internalType: "bool" }], stateMutability: "view" }, { type: "function", name: "updateCovenantThreshold", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "covenantName", type: "string", internalType: "string" }, { name: "newThreshold", type: "uint256", internalType: "uint256" }], outputs: [], stateMutability: "nonpayable" }, { type: "event", name: "CovenantAdded", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "covenantName", type: "string", indexed: false, internalType: "string" }, { name: "threshold", type: "uint256", indexed: false, internalType: "uint256" }, { name: "thresholdType", type: "string", indexed: false, internalType: "string" }], anonymous: false }, { type: "event", name: "CovenantDeactivated", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "covenantName", type: "string", indexed: false, internalType: "string" }], anonymous: false }, { type: "event", name: "CovenantUpdated", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "covenantName", type: "string", indexed: false, internalType: "string" }, { name: "newThreshold", type: "uint256", indexed: false, internalType: "uint256" }], anonymous: false }, { type: "event", name: "LoanRegistered", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "tokenAddress", type: "address", indexed: true, internalType: "address" }, { name: "principalAmount", type: "uint256", indexed: false, internalType: "uint256" }, { name: "covenantCount", type: "uint256", indexed: false, internalType: "uint256" }, { name: "timestamp", type: "uint256", indexed: false, internalType: "uint256" }], anonymous: false }, { type: "event", name: "RoleAdminChanged", inputs: [{ name: "role", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "previousAdminRole", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "newAdminRole", type: "bytes32", indexed: true, internalType: "bytes32" }], anonymous: false }, { type: "event", name: "RoleGranted", inputs: [{ name: "role", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "account", type: "address", indexed: true, internalType: "address" }, { name: "sender", type: "address", indexed: true, internalType: "address" }], anonymous: false }, { type: "event", name: "RoleRevoked", inputs: [{ name: "role", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "account", type: "address", indexed: true, internalType: "address" }, { name: "sender", type: "address", indexed: true, internalType: "address" }], anonymous: false }, { type: "error", name: "AccessControlBadConfirmation", inputs: [] }, { type: "error", name: "AccessControlUnauthorizedAccount", inputs: [{ name: "account", type: "address", internalType: "address" }, { name: "neededRole", type: "bytes32", internalType: "bytes32" }] }, { type: "error", name: "ConvenantNotFound", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "covenantName", type: "string", internalType: "string" }] }, { type: "error", name: "InvalidCovenantArray", inputs: [] }, { type: "error", name: "InvalidTokenAddress", inputs: [] }, { type: "error", name: "LoanAlreadyRegistered", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }] }, { type: "error", name: "LoanNotRegistered", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }] }],
-  bytecode: { object: "0x60803461007257601f61173938819003918201601f19168301916001600160401b038311848410176100765780849260209460405283398101031261007257516001600160a01b0381168103610072576100629061005c3361008a565b50610100565b5060405161154590816101948239f35b5f80fd5b634e487b7160e01b5f52604160045260245ffd5b6001600160a01b0381165f9081525f5160206117195f395f51905f52602052604090205460ff166100fb576001600160a01b03165f8181525f5160206117195f395f51905f5260205260408120805460ff191660011790553391905f5160206116d95f395f51905f528180a4600190565b505f90565b6001600160a01b0381165f9081525f5160206116f95f395f51905f52602052604090205460ff166100fb576001600160a01b03165f8181525f5160206116f95f395f51905f5260205260408120805460ff191660011790553391907f27474d19bed8c237b6f0ac3a8e704c5f2dc7c7f0e86a42e967d95cfc461c1d22905f5160206116d95f395f51905f529080a460019056fe6101c06040526004361015610012575f80fd5b5f3560e01c80630137f49314610ec057806301ffc9a714610e6a578063248a9ca314610e385780632f2ff15d14610dfb57806336568abe14610db75780633ab6613a1461055857806351d274de1461050a57806389f75e8a146104d25780638aa1fef7146104205780638bb7e473146104035780638ef5c48d146102cb57806391d148541461028357806393de0af914610249578063a217fddf1461022f578063bc09792f146101fd578063c3d8b3401461011d5763d547741f146100d5575f80fd5b34610119576040366003190112610119576101176004356100f4610fba565b9061011261010d825f525f602052600160405f20015490565b6113cf565b61148f565b005b5f80fd5b34610119576060366003190112610119576004356024356001600160401b03811161011957610150903690600401611018565b91906044359261015e611360565b61016783611333565b825f526001602052610180600660405f200182846112e0565b9361018b85546110b4565b156101da578060027f2c0c38f77f6e07d8cdab906f404dbca1bf502456d9730e24e48004198a776e71959601556101cf6040519384936040855260408501916112f9565b9060208301520390a2005b5060405163b93204b760e01b81529182916101f9918560048501611319565b0390fd5b34610119576020366003190112610119576004355f526001602052602060ff600760405f200154166040519015158152f35b34610119575f3660031901126101195760206040515f8152f35b34610119575f3660031901126101195760206040517f27474d19bed8c237b6f0ac3a8e704c5f2dc7c7f0e86a42e967d95cfc461c1d228152f35b346101195760403660031901126101195761029c610fba565b6004355f525f60205260405f209060018060a01b03165f52602052602060ff60405f2054166040519015158152f35b34610119576102d936611045565b91906102e482611333565b815f5260016020526102fd600660405f200184836112e0565b916040519261030b84611078565b610314816110ec565b8452610322600182016110ec565b936020810194855260028201549360408201948552610343600384016110ec565b936060830194855260ff600561035b600487016110ec565b95608086019687520154169760a084019815158952835151156103e6575050506103dc926103ad96926103bb6103ce935197519651925191519451151596604051998a9960c08b5260c08b0190610f3e565b9089820360208b0152610f3e565b9160408801528682036060880152610f3e565b908482036080860152610f3e565b9060a08301520390f35b6101f99060405193849363b93204b760e01b855260048501611319565b34610119575f366003190112610119576020600254604051908152f35b346101195761042e36611045565b9190610438611360565b61044182611333565b815f52600160205261045a600660405f200184836112e0565b9261046584546110b4565b156104b45760057f277d87b869727f9eaea1381ffc63a3674cba7eef4e2009d7d4b95c4b6ffb3b2193940160ff1981541690556104af6040519283926020845260208401916112f9565b0390a2005b60405163b93204b760e01b81529182916101f9918560048501611319565b3461011957602036600319011261011957600435600254811015610119576104fb602091611000565b90549060031b1c604051908152f35b346101195760203660031901126101195760043561052781611333565b5f526001602052610554610540600560405f200161118c565b604051918291602083526020830190610f62565b0390f35b346101195761012036600319011261011957610572610fba565b610180526084356001600160401b03811161011957610595903690600401610fd0565b6101a05260c05260a4356001600160401b038111610119576105bb903690600401610fd0565b60a0526101405260c4356001600160401b038111610119576105e1903690600401610fd0565b610100526101605260e4356001600160401b03811161011957610608903690600401610fd0565b60e05261012052610104356001600160401b0381116101195761062f903690600401610fd0565b60805261063a611360565b6004355f52600160205260ff600760405f20015416610da257610180516001600160a01b031615610d93576101a05115610d565760a0516101a05114801590610d83575b8015610d74575b8015610d65575b610d56576004355f52600160205260405f209060043582556001820160018060a01b0361018051166bffffffffffffffffffffffff60a01b8254161790556044356002830155426003830155606435600483015560078201600160ff198254161790555f915b6101a051831061079357600254600160401b81101561077f5780600161071b9201600255611000565b81549060031b90600435821b915f19901b191617905560405160443581526101a051602082015242604082015260018060a01b036101805116907f25bee5063b2a922264e207d82efab5ad6b05550795e0f26ba6fe05cd7077543b606060043592a3005b634e487b7160e01b5f52604160045260245ffd5b6107a3836101a05160c0516111ec565b6005830154600160401b81101561077f576001810160058501819055811015610d4257600584015f5260205f2001916001600160401b03821161077f576107f4826107ee85546110b4565b8561122d565b5f90601f8311600114610cdc5761082292915f9183610cd1575b50508160011b915f199060031b1c19161790565b90555b826108ce6108a96108a061083f846101a05160c0516111ec565b93906108bf886108558860a051610140516111ec565b96906108688a610100516101605161128b565b359761088961087d8c60e051610120516111ec565b9f9095608051906111ec565b9890966040519b6108998d611078565b369161129b565b8a52369161129b565b9a602088019b8c5260408801968752369161129b565b9260608601938452369161129b565b9160808401928352600160a08501526108fa6108f0866101a05160c0516111ec565b60068901916112e0565b9784518051906001600160401b03821161077f576109228261091c8d546110b4565b8d61122d565b602090601f8311600114610c6e5761095092915f9183610c005750508160011b915f199060031b1c19161790565b89555b51805160018a01916001600160401b03821161077f57610977826107ee85546110b4565b602090601f8311600114610c0b576109a592915f9183610c005750508160011b915f199060031b1c19161790565b90555b51600288015551805160038801916001600160401b03821161077f576109d2826107ee85546110b4565b602090601f8311600114610b9d57610a0092915f9183610b925750508160011b915f199060031b1c19161790565b90555b519485516001600160401b03811161077f57610a2f81610a2660048501546110b4565b6004850161122d565b602096601f8211600114610b1f5791610a6782600593600198999a60a0965f92610b145750508160011b915f199060031b1c19161790565b60048201555b01910151151560ff801983541691161790557fe179c7aea0ef47bb61c5502f5a87afaa640dd4f4c97d6e1be84fa1c7e97fa984610ab0826101a05160c0516111ec565b9190610ac384610100516101605161128b565b3592610b09610ad88660e051610120516111ec565b610af26040979297519586956060875260608701916112f9565b9160208501528382036040850152600435966112f9565b0390a20191906106f2565b015190508b8061080e565b96600483015f52805f20975f5b601f1984168110610b7a575082600197989960a095938993600596601f19811610610b62575b505050811b016004820155610a6d565b01515f1960f88460031b161c191690558a8080610b52565b818301518a5560019099019860209283019201610b2c565b015190508a8061080e565b90601f19831691845f52815f20925f5b818110610be85750908460019594939210610bd0575b505050811b019055610a03565b01515f1960f88460031b161c19169055898080610bc3565b92936020600181928786015181550195019301610bad565b015190508c8061080e565b90601f19831691845f52815f20925f5b818110610c565750908460019594939210610c3e575b505050811b0190556109a8565b01515f1960f88460031b161c191690558b8080610c31565b92936020600181928786015181550195019301610c1b565b90601f198316918c5f52815f20925f5b818110610cb95750908460019594939210610ca1575b505050811b018955610953565b01515f1960f88460031b161c191690558b8080610c94565b92936020600181928786015181550195019301610c7e565b01359050878061080e565b835f5260205f20915f5b601f1985168110610d2a575090839291600194601f19811610610d11575b505050811b019055610825565b01355f19600384901b60f8161c19169055868080610d04565b82820135845560019093019260209182019101610ce6565b634e487b7160e01b5f52603260045260245ffd5b630ffa118160e01b5f5260045ffd5b506080516101a051141561068c565b5060e0516101a0511415610685565b50610100516101a051141561067e565b630f58058360e11b5f5260045ffd5b63c343b2ef60e01b5f5260043560045260245ffd5b3461011957604036600319011261011957610dd0610fba565b336001600160a01b03821603610dec576101179060043561148f565b63334bd91960e11b5f5260045ffd5b3461011957604036600319011261011957610117600435610e1a610fba565b90610e3361010d825f525f602052600160405f20015490565b611407565b34610119576020366003190112610119576020610e626004355f525f602052600160405f20015490565b604051908152f35b346101195760203660031901126101195760043563ffffffff60e01b811680910361011957602090637965db0b60e01b8114908115610eaf575b506040519015158152f35b6301ffc9a760e01b14905082610ea4565b3461011957602036600319011261011957600435610edd81611333565b5f52600160205260405f2060018060a01b03600182015416610554600283015492600381015490610f1560056004830154920161118c565b91604051958695865260208601526040850152606084015260a0608084015260a0830190610f62565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b9080602083519182815201916020808360051b8301019401925f915b838310610f8d57505050505090565b9091929394602080610fab600193601f198682030187528951610f3e565b97019301930191939290610f7e565b602435906001600160a01b038216820361011957565b9181601f84011215610119578235916001600160401b038311610119576020808501948460051b01011161011957565b600254811015610d425760025f5260205f2001905f90565b9181601f84011215610119578235916001600160401b038311610119576020838186019501011161011957565b9060406003198301126101195760043591602435906001600160401b0382116101195761107491600401611018565b9091565b60c081019081106001600160401b0382111761077f57604052565b90601f801991011681019081106001600160401b0382111761077f57604052565b90600182811c921680156110e2575b60208310146110ce57565b634e487b7160e01b5f52602260045260245ffd5b91607f16916110c3565b9060405191825f8254926110ff846110b4565b808452936001811690811561116a5750600114611126575b5061112492500383611093565b565b90505f9291925260205f20905f915b81831061114e575050906020611124928201015f611117565b6020919350806001915483858901015201910190918492611135565b90506020925061112494915060ff191682840152151560051b8201015f611117565b9081546001600160401b03811161077f57604051926111b160208360051b0185611093565b81845260208401905f5260205f205f915b8383106111cf5750505050565b6001602081926111de856110ec565b8152019201920191906111c2565b9190811015610d425760051b81013590601e19813603018212156101195701908135916001600160401b038311610119576020018236038113610119579190565b919091601f831161123e575b505050565b81831161124a57505050565b5f5260205f206020601f830160051c9210611283575b81601f9101920160051c03905f5b82811015611239575f8282015560010161126e565b5f9150611260565b9190811015610d425760051b0190565b9291926001600160401b03821161077f57604051916112c4601f8201601f191660200184611093565b829481845281830111610119578281602093845f960137010152565b6020919283604051948593843782019081520301902090565b908060209392818452848401375f828201840152601f01601f1916010190565b6040906113309492815281602082015201916112f9565b90565b805f52600160205260ff600760405f200154161561134e5750565b634607cd3160e11b5f5260045260245ffd5b335f9081527f88b5e9d578fd2c8ef697d9eaf521eed09df8abdd2177a8b24330be81f4cea85e602052604090205460ff161561139857565b63e2517d3f60e01b5f52336004527f27474d19bed8c237b6f0ac3a8e704c5f2dc7c7f0e86a42e967d95cfc461c1d2260245260445ffd5b5f8181526020818152604080832033845290915290205460ff16156113f15750565b63e2517d3f60e01b5f523360045260245260445ffd5b5f818152602081815260408083206001600160a01b038616845290915290205460ff16611489575f818152602081815260408083206001600160a01b0395909516808452949091528120805460ff19166001179055339291907f2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d9080a4600190565b50505f90565b5f818152602081815260408083206001600160a01b038616845290915290205460ff1615611489575f818152602081815260408083206001600160a01b0395909516808452949091528120805460ff19169055339291907ff6391f5c32d9c69d2a47ea670b442974b53935d1edc7fd64eb21e047a839171b9080a460019056fea26469706673582212201de6d3f94a4df7977cb70905ab81a056d2642e807d21b14842ab8da4444ae87264736f6c634300082100332f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d88b5e9d578fd2c8ef697d9eaf521eed09df8abdd2177a8b24330be81f4cea85ead3228b676f7d3cd4284a5443f17f1962b36e491b30a40b2405849e597ba5fb5", sourceMap: "146:8694:23:-:0;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;2482:45;2461:10;2430:42;2461:10;2430:42;:::i;:::-;;2482:45;:::i;:::-;;146:8694;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;-1:-1:-1;146:8694:23;;;;;-1:-1:-1;146:8694:23;6155:316:15;-1:-1:-1;;;;;146:8694:23;;2241:4:15;146:8694:23;;;-1:-1:-1;;;;;;;;;;;146:8694:23;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;2241:4:15;146:8694:23;;;-1:-1:-1;;;;;;;;;;;146:8694:23;;;;;;;-1:-1:-1;;146:8694:23;;;;;735:10:17;;146:8694:23;-1:-1:-1;;;;;;;;;;;2241:4:15;;6346:40;6323:4;6400:11;:::o;6248:217::-;6442:12;2241:4;6442:12;:::o;6155:316::-;-1:-1:-1;;;;;146:8694:23;;;;;;-1:-1:-1;;;;;;;;;;;146:8694:23;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;-1:-1:-1;;;;;;;;;;;146:8694:23;;;;;;;-1:-1:-1;;146:8694:23;;;;;735:10:17;;146:8694:23;1357:26;;-1:-1:-1;;;;;;;;;;;6346:40:15;146:8694:23;6346:40:15;6323:4;6400:11;:::o", linkReferences: {} },
-  deployedBytecode: { object: "0x6101c06040526004361015610012575f80fd5b5f3560e01c80630137f49314610ec057806301ffc9a714610e6a578063248a9ca314610e385780632f2ff15d14610dfb57806336568abe14610db75780633ab6613a1461055857806351d274de1461050a57806389f75e8a146104d25780638aa1fef7146104205780638bb7e473146104035780638ef5c48d146102cb57806391d148541461028357806393de0af914610249578063a217fddf1461022f578063bc09792f146101fd578063c3d8b3401461011d5763d547741f146100d5575f80fd5b34610119576040366003190112610119576101176004356100f4610fba565b9061011261010d825f525f602052600160405f20015490565b6113cf565b61148f565b005b5f80fd5b34610119576060366003190112610119576004356024356001600160401b03811161011957610150903690600401611018565b91906044359261015e611360565b61016783611333565b825f526001602052610180600660405f200182846112e0565b9361018b85546110b4565b156101da578060027f2c0c38f77f6e07d8cdab906f404dbca1bf502456d9730e24e48004198a776e71959601556101cf6040519384936040855260408501916112f9565b9060208301520390a2005b5060405163b93204b760e01b81529182916101f9918560048501611319565b0390fd5b34610119576020366003190112610119576004355f526001602052602060ff600760405f200154166040519015158152f35b34610119575f3660031901126101195760206040515f8152f35b34610119575f3660031901126101195760206040517f27474d19bed8c237b6f0ac3a8e704c5f2dc7c7f0e86a42e967d95cfc461c1d228152f35b346101195760403660031901126101195761029c610fba565b6004355f525f60205260405f209060018060a01b03165f52602052602060ff60405f2054166040519015158152f35b34610119576102d936611045565b91906102e482611333565b815f5260016020526102fd600660405f200184836112e0565b916040519261030b84611078565b610314816110ec565b8452610322600182016110ec565b936020810194855260028201549360408201948552610343600384016110ec565b936060830194855260ff600561035b600487016110ec565b95608086019687520154169760a084019815158952835151156103e6575050506103dc926103ad96926103bb6103ce935197519651925191519451151596604051998a9960c08b5260c08b0190610f3e565b9089820360208b0152610f3e565b9160408801528682036060880152610f3e565b908482036080860152610f3e565b9060a08301520390f35b6101f99060405193849363b93204b760e01b855260048501611319565b34610119575f366003190112610119576020600254604051908152f35b346101195761042e36611045565b9190610438611360565b61044182611333565b815f52600160205261045a600660405f200184836112e0565b9261046584546110b4565b156104b45760057f277d87b869727f9eaea1381ffc63a3674cba7eef4e2009d7d4b95c4b6ffb3b2193940160ff1981541690556104af6040519283926020845260208401916112f9565b0390a2005b60405163b93204b760e01b81529182916101f9918560048501611319565b3461011957602036600319011261011957600435600254811015610119576104fb602091611000565b90549060031b1c604051908152f35b346101195760203660031901126101195760043561052781611333565b5f526001602052610554610540600560405f200161118c565b604051918291602083526020830190610f62565b0390f35b346101195761012036600319011261011957610572610fba565b610180526084356001600160401b03811161011957610595903690600401610fd0565b6101a05260c05260a4356001600160401b038111610119576105bb903690600401610fd0565b60a0526101405260c4356001600160401b038111610119576105e1903690600401610fd0565b610100526101605260e4356001600160401b03811161011957610608903690600401610fd0565b60e05261012052610104356001600160401b0381116101195761062f903690600401610fd0565b60805261063a611360565b6004355f52600160205260ff600760405f20015416610da257610180516001600160a01b031615610d93576101a05115610d565760a0516101a05114801590610d83575b8015610d74575b8015610d65575b610d56576004355f52600160205260405f209060043582556001820160018060a01b0361018051166bffffffffffffffffffffffff60a01b8254161790556044356002830155426003830155606435600483015560078201600160ff198254161790555f915b6101a051831061079357600254600160401b81101561077f5780600161071b9201600255611000565b81549060031b90600435821b915f19901b191617905560405160443581526101a051602082015242604082015260018060a01b036101805116907f25bee5063b2a922264e207d82efab5ad6b05550795e0f26ba6fe05cd7077543b606060043592a3005b634e487b7160e01b5f52604160045260245ffd5b6107a3836101a05160c0516111ec565b6005830154600160401b81101561077f576001810160058501819055811015610d4257600584015f5260205f2001916001600160401b03821161077f576107f4826107ee85546110b4565b8561122d565b5f90601f8311600114610cdc5761082292915f9183610cd1575b50508160011b915f199060031b1c19161790565b90555b826108ce6108a96108a061083f846101a05160c0516111ec565b93906108bf886108558860a051610140516111ec565b96906108688a610100516101605161128b565b359761088961087d8c60e051610120516111ec565b9f9095608051906111ec565b9890966040519b6108998d611078565b369161129b565b8a52369161129b565b9a602088019b8c5260408801968752369161129b565b9260608601938452369161129b565b9160808401928352600160a08501526108fa6108f0866101a05160c0516111ec565b60068901916112e0565b9784518051906001600160401b03821161077f576109228261091c8d546110b4565b8d61122d565b602090601f8311600114610c6e5761095092915f9183610c005750508160011b915f199060031b1c19161790565b89555b51805160018a01916001600160401b03821161077f57610977826107ee85546110b4565b602090601f8311600114610c0b576109a592915f9183610c005750508160011b915f199060031b1c19161790565b90555b51600288015551805160038801916001600160401b03821161077f576109d2826107ee85546110b4565b602090601f8311600114610b9d57610a0092915f9183610b925750508160011b915f199060031b1c19161790565b90555b519485516001600160401b03811161077f57610a2f81610a2660048501546110b4565b6004850161122d565b602096601f8211600114610b1f5791610a6782600593600198999a60a0965f92610b145750508160011b915f199060031b1c19161790565b60048201555b01910151151560ff801983541691161790557fe179c7aea0ef47bb61c5502f5a87afaa640dd4f4c97d6e1be84fa1c7e97fa984610ab0826101a05160c0516111ec565b9190610ac384610100516101605161128b565b3592610b09610ad88660e051610120516111ec565b610af26040979297519586956060875260608701916112f9565b9160208501528382036040850152600435966112f9565b0390a20191906106f2565b015190508b8061080e565b96600483015f52805f20975f5b601f1984168110610b7a575082600197989960a095938993600596601f19811610610b62575b505050811b016004820155610a6d565b01515f1960f88460031b161c191690558a8080610b52565b818301518a5560019099019860209283019201610b2c565b015190508a8061080e565b90601f19831691845f52815f20925f5b818110610be85750908460019594939210610bd0575b505050811b019055610a03565b01515f1960f88460031b161c19169055898080610bc3565b92936020600181928786015181550195019301610bad565b015190508c8061080e565b90601f19831691845f52815f20925f5b818110610c565750908460019594939210610c3e575b505050811b0190556109a8565b01515f1960f88460031b161c191690558b8080610c31565b92936020600181928786015181550195019301610c1b565b90601f198316918c5f52815f20925f5b818110610cb95750908460019594939210610ca1575b505050811b018955610953565b01515f1960f88460031b161c191690558b8080610c94565b92936020600181928786015181550195019301610c7e565b01359050878061080e565b835f5260205f20915f5b601f1985168110610d2a575090839291600194601f19811610610d11575b505050811b019055610825565b01355f19600384901b60f8161c19169055868080610d04565b82820135845560019093019260209182019101610ce6565b634e487b7160e01b5f52603260045260245ffd5b630ffa118160e01b5f5260045ffd5b506080516101a051141561068c565b5060e0516101a0511415610685565b50610100516101a051141561067e565b630f58058360e11b5f5260045ffd5b63c343b2ef60e01b5f5260043560045260245ffd5b3461011957604036600319011261011957610dd0610fba565b336001600160a01b03821603610dec576101179060043561148f565b63334bd91960e11b5f5260045ffd5b3461011957604036600319011261011957610117600435610e1a610fba565b90610e3361010d825f525f602052600160405f20015490565b611407565b34610119576020366003190112610119576020610e626004355f525f602052600160405f20015490565b604051908152f35b346101195760203660031901126101195760043563ffffffff60e01b811680910361011957602090637965db0b60e01b8114908115610eaf575b506040519015158152f35b6301ffc9a760e01b14905082610ea4565b3461011957602036600319011261011957600435610edd81611333565b5f52600160205260405f2060018060a01b03600182015416610554600283015492600381015490610f1560056004830154920161118c565b91604051958695865260208601526040850152606084015260a0608084015260a0830190610f62565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b9080602083519182815201916020808360051b8301019401925f915b838310610f8d57505050505090565b9091929394602080610fab600193601f198682030187528951610f3e565b97019301930191939290610f7e565b602435906001600160a01b038216820361011957565b9181601f84011215610119578235916001600160401b038311610119576020808501948460051b01011161011957565b600254811015610d425760025f5260205f2001905f90565b9181601f84011215610119578235916001600160401b038311610119576020838186019501011161011957565b9060406003198301126101195760043591602435906001600160401b0382116101195761107491600401611018565b9091565b60c081019081106001600160401b0382111761077f57604052565b90601f801991011681019081106001600160401b0382111761077f57604052565b90600182811c921680156110e2575b60208310146110ce57565b634e487b7160e01b5f52602260045260245ffd5b91607f16916110c3565b9060405191825f8254926110ff846110b4565b808452936001811690811561116a5750600114611126575b5061112492500383611093565b565b90505f9291925260205f20905f915b81831061114e575050906020611124928201015f611117565b6020919350806001915483858901015201910190918492611135565b90506020925061112494915060ff191682840152151560051b8201015f611117565b9081546001600160401b03811161077f57604051926111b160208360051b0185611093565b81845260208401905f5260205f205f915b8383106111cf5750505050565b6001602081926111de856110ec565b8152019201920191906111c2565b9190811015610d425760051b81013590601e19813603018212156101195701908135916001600160401b038311610119576020018236038113610119579190565b919091601f831161123e575b505050565b81831161124a57505050565b5f5260205f206020601f830160051c9210611283575b81601f9101920160051c03905f5b82811015611239575f8282015560010161126e565b5f9150611260565b9190811015610d425760051b0190565b9291926001600160401b03821161077f57604051916112c4601f8201601f191660200184611093565b829481845281830111610119578281602093845f960137010152565b6020919283604051948593843782019081520301902090565b908060209392818452848401375f828201840152601f01601f1916010190565b6040906113309492815281602082015201916112f9565b90565b805f52600160205260ff600760405f200154161561134e5750565b634607cd3160e11b5f5260045260245ffd5b335f9081527f88b5e9d578fd2c8ef697d9eaf521eed09df8abdd2177a8b24330be81f4cea85e602052604090205460ff161561139857565b63e2517d3f60e01b5f52336004527f27474d19bed8c237b6f0ac3a8e704c5f2dc7c7f0e86a42e967d95cfc461c1d2260245260445ffd5b5f8181526020818152604080832033845290915290205460ff16156113f15750565b63e2517d3f60e01b5f523360045260245260445ffd5b5f818152602081815260408083206001600160a01b038616845290915290205460ff16611489575f818152602081815260408083206001600160a01b0395909516808452949091528120805460ff19166001179055339291907f2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d9080a4600190565b50505f90565b5f818152602081815260408083206001600160a01b038616845290915290205460ff1615611489575f818152602081815260408083206001600160a01b0395909516808452949091528120805460ff19169055339291907ff6391f5c32d9c69d2a47ea670b442974b53935d1edc7fd64eb21e047a839171b9080a460019056fea26469706673582212201de6d3f94a4df7977cb70905ab81a056d2642e807d21b14842ab8da4444ae87264736f6c63430008210033", sourceMap: "146:8694:23:-:0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;4723:26:15;146:8694:23;;;;:::i;:::-;4693:18:15;2484:4;4693:18;;3877:6;146:8694:23;3877:6:15;146:8694:23;;3877:22:15;146:8694:23;3877:6:15;146:8694:23;3877:22:15;146:8694:23;3786:120:15;;4693:18;2484:4;:::i;:::-;4723:26;:::i;:::-;146:8694:23;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;:::i;:::-;;;;;2484:4:15;;;:::i;:::-;2348:6:23;;;:::i;:::-;146:8694;;;;;;;5668:29;146:8694;;;5668:29;146:8694;;;:::i;:::-;;;;;;:::i;:::-;5725:32;5721:109;;5848:18;;5896:51;5848:18;;;146:8694;;;;;;;;;;;;;;;:::i;:::-;;;;;;5896:51;;;146:8694;5721:109;-1:-1:-1;146:8694:23;;-1:-1:-1;;;5780:39:23;;146:8694;;;5780:39;;146:8694;;5780:39;;;:::i;:::-;;;;146:8694;;;;;;-1:-1:-1;;146:8694:23;;;;;;;;;;;;;8642:26;146:8694;;;8642:26;146:8694;;;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;;1357:26;146:8694;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;:::i;:::-;;;;;;;;;;;2930:29:15;146:8694:23;;;;;;-1:-1:-1;146:8694:23;;;;;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;;;;;;:::i;:::-;2348:6;;;;;:::i;:::-;146:8694;;;7625:11;146:8694;;;7625:29;146:8694;;;7625:29;146:8694;;;:::i;:::-;;;;;;;;:::i;:::-;;;;:::i;:::-;;;;7625:11;146:8694;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;7688:13;;146:8694;7682:32;7678:109;;7826:13;;;146:8694;7826:13;146:8694;7826:13;;146:8694;;7826:13;;7853:25;;146:8694;;7924:22;;7960:26;;146:8694;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;:::i;:::-;;;;;;;;;7678:109;7737:39;146:8694;;;6333:39;;;;;;7737;;146:8694;7737:39;;;:::i;146:8694::-;;;;;;-1:-1:-1;;146:8694:23;;;;;8456:15;146:8694;;;;;;;;;;;;;;:::i;:::-;2484:4:15;;;;:::i;:::-;2348:6:23;;;:::i;:::-;146:8694;;;6221:11;146:8694;;;6221:29;146:8694;;;6221:29;146:8694;;;:::i;:::-;;;;;;:::i;:::-;6278:32;6274:109;;6401:17;6441:41;6401:17;;;146:8694;;;;;;;;;;;;;;;;;;;;;:::i;:::-;6441:41;;;146:8694;6274:109;146:8694;;-1:-1:-1;;;6333:39:23;;146:8694;;;6333:39;;146:8694;;6333:39;;;:::i;146:8694::-;;;;;;-1:-1:-1;;146:8694:23;;;;;;1447:32;146:8694;1447:32;;;;;;146:8694;1447:32;;:::i;:::-;146:8694;;;;;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;2348:6;;;:::i;:::-;146:8694;;;;;;;8257:33;146:8694;;;8257:33;146:8694;:::i;:::-;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;:::i;:::-;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;:::i;:::-;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;:::i;:::-;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;:::i;:::-;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;:::i;:::-;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;:::i;:::-;;;2484:4:15;;:::i;:::-;146:8694:23;;;;;;;;3619:26;146:8694;;;3619:26;146:8694;;3615:93;;3721:26;;-1:-1:-1;;;;;146:8694:23;3721:26;3717:85;;3815:25;;;3811:85;;3946:24;;3922:48;;;;;:105;;;146:8694;3922:166;;;;146:8694;3922:230;;;;146:8694;3905:312;;146:8694;;;;;;;;;;;;;;;;4324:19;;146:8694;;;;;3721:26;;146:8694;;;;;;;;;;;;4368:22;;;146:8694;4447:15;4418:26;;;146:8694;;;;4472:25;;146:8694;3619:26;4528:13;;146:8694;;;;;;;;;;4567:576;4587:24;;;;;;;4368:22;146:8694;-1:-1:-1;;;146:8694:23;;;;;;;;;;4368:22;146:8694;;:::i;:::-;;;;4418:26;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;4447:15;146:8694;;;;;;;;;3721:26;;146:8694;;5213:162;146:8694;;;5213:162;;146:8694;;;;;;;;;;;;;4613:3;4658:16;;;;;;;:::i;:::-;4632:20;;;146:8694;-1:-1:-1;;;146:8694:23;;;;;;;;4632:20;;;146:8694;;;;;;;;4632:20;;;146:8694;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;:::i;:::-;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;4759:16;146:8694;;;4759:16;;;;;;;:::i;:::-;4811:20;;146:8694;4811:20;;;;;;;;:::i;:::-;4860:13;;;;;;;;;:::i;:::-;146:8694;4906:17;4960:20;4906:17;;;;;;;:::i;:::-;4960:20;;;;;;;:::i;:::-;146:8694;;;;;;;;;:::i;:::-;;;;:::i;:::-;;;;;;:::i;:::-;4726:301;146:8694;4726:301;;146:8694;;;;4726:301;;146:8694;;;;;;:::i;:::-;4726:301;146:8694;4726:301;;146:8694;;;;;;:::i;:::-;4726:301;146:8694;4726:301;;146:8694;;;;;4726:301;;146:8694;;4706:16;;;;;;;:::i;:::-;4689;;;146:8694;;:::i;:::-;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;:::i;:::-;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;4368:22;146:8694;;;;;;4418:26;146:8694;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;:::i;:::-;;;;;:::i;:::-;;;;;;;;;;;;;4632:20;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;4726:301;;146:8694;;;;;;;;;;;;;;5059:73;5081:16;;;;;;;:::i;:::-;5099:13;;;;;;;;;:::i;:::-;146:8694;5114:17;146:8694;5114:17;;;;;;;:::i;:::-;146:8694;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;:::i;:::-;5059:73;;;146:8694;4572:13;;;;146:8694;;;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;;;;;;;;;;;;4632:20;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;4418:26;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;4418:26;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;4418:26;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;4418:26;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;4418:26:23;146:8694;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;3905:312;3863:22;;;146:8694;4184:22;146:8694;;4184:22;3922:230;4128:24;;;4104:48;;;;3922:230;;:166;4067:21;;;4043:45;;;;3922:166;;:105;4010:17;;;3986:41;;;;3922:105;;3717:85;3770:21;;;146:8694;3770:21;146:8694;;3770:21;3615:93;3668:29;;;146:8694;3668:29;146:8694;;;;;;3668:29;146:8694;;;;;;-1:-1:-1;;146:8694:23;;;;;;:::i;:::-;735:10:17;-1:-1:-1;;;;;146:8694:23;;5397:34:15;5393:102;;5505:37;146:8694:23;;;5505:37:15;:::i;5393:102::-;5454:30;;;146:8694:23;5454:30:15;146:8694:23;;5454:30:15;146:8694:23;;;;;;-1:-1:-1;;146:8694:23;;;;4306:25:15;146:8694:23;;;;:::i;:::-;4276:18:15;2484:4;4276:18;;3877:6;146:8694:23;3877:6:15;146:8694:23;;3877:22:15;146:8694:23;3877:6:15;146:8694:23;3877:22:15;146:8694:23;3786:120:15;;2484:4;4306:25;:::i;146:8694:23:-;;;;;;-1:-1:-1;;146:8694:23;;;;;;;;3877:6:15;146:8694:23;3877:6:15;146:8694:23;;3877:22:15;146:8694:23;3877:6:15;146:8694:23;3877:22:15;146:8694:23;3786:120:15;;146:8694:23;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;;;;;;;;;;;;;;-1:-1:-1;;;2649:47:15;;;:87;;;;146:8694:23;;;;;;;;;;2649:87:15;-1:-1:-1;;;829:40:18;;-1:-1:-1;2649:87:15;;;146:8694:23;;;;;;-1:-1:-1;;146:8694:23;;;;;;2348:6;;;:::i;:::-;146:8694;;;;;;;;;;;;;;6959:19;;146:8694;;;6992:22;;;146:8694;7028:26;;;;146:8694;7068:25;146:8694;7107:20;146:8694;7068:25;;146:8694;7107:20;;146:8694;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;;;-1:-1:-1;;146:8694:23;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;:::o;:::-;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;;;:::o;:::-;4368:22;146:8694;;;;;;4368:22;-1:-1:-1;146:8694:23;;-1:-1:-1;146:8694:23;;;-1:-1:-1;146:8694:23;:::o;:::-;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;:::o;:::-;;;-1:-1:-1;;146:8694:23;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;:::i;:::-;;;:::o;:::-;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;:::o;:::-;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;:::o;:::-;;;-1:-1:-1;146:8694:23;;;;;-1:-1:-1;146:8694:23;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;-1:-1:-1;146:8694:23;;-1:-1:-1;146:8694:23;-1:-1:-1;146:8694:23;;;;;;;;;;;:::o;:::-;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;:::o;:::-;;;;;;;;;:::o;:::-;-1:-1:-1;146:8694:23;;-1:-1:-1;146:8694:23;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;;-1:-1:-1;146:8694:23;;;;;;;;;-1:-1:-1;;;146:8694:23;;;;;;;;;;;;;;:::o;:::-;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;:::i;:::-;;;;;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;-1:-1:-1;146:8694:23;;;;;;;;-1:-1:-1;;146:8694:23;;;;:::o;:::-;;;;;;;;;;;;;;;;:::i;:::-;;:::o;8681:157::-;146:8694;-1:-1:-1;146:8694:23;8747:11;146:8694;;;8747:26;146:8694;-1:-1:-1;146:8694:23;8747:26;146:8694;;8746:27;8742:90;;8681:157;:::o;8742:90::-;8796:25;;;-1:-1:-1;8796:25:23;;146:8694;;-1:-1:-1;8796:25:23;3175:103:15;735:10:17;2930:6:15;146:8694:23;;;;;;;;;;;;3495:23:15;3491:108;;3175:103::o;3491:108::-;3541:47;;;2930:6;3541:47;735:10:17;3541:47:15;146:8694:23;1357:26;146:8694;;;2930:6:15;3541:47;3175:103;2930:6;146:8694:23;;;;;;;;;;;735:10:17;146:8694:23;;;;;;;;;;3495:23:15;3491:108;;3175:103;:::o;3491:108::-;3541:47;;;2930:6;3541:47;735:10:17;3541:47:15;146:8694:23;;;;2930:6:15;3541:47;6155:316;146:8694:23;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;;;735:10:17;;146:8694:23;;6346:40:15;;146:8694:23;6346:40:15;6323:4;6400:11;:::o;6248:217::-;6442:12;;146:8694:23;6442:12:15;:::o;6708:317::-;146:8694:23;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;146:8694:23;;;;;;;;;;;;;;;-1:-1:-1;;146:8694:23;;;735:10:17;;146:8694:23;;6900:40:15;;146:8694:23;6900:40:15;146:8694:23;6954:11:15;:::o", linkReferences: {} },
-  methodIdentifiers: { "DEFAULT_ADMIN_ROLE()": "a217fddf", "WORKFLOW_ROLE()": "93de0af9", "deactivateCovenant(bytes32,string)": "8aa1fef7", "getCovenant(bytes32,string)": "8ef5c48d", "getCovenantNames(bytes32)": "51d274de", "getLoanSchema(bytes32)": "0137f493", "getRegisteredLoanCount()": "8bb7e473", "getRoleAdmin(bytes32)": "248a9ca3", "grantRole(bytes32,address)": "2f2ff15d", "hasRole(bytes32,address)": "91d14854", "isLoanRegistered(bytes32)": "bc09792f", "registerLoan(bytes32,address,uint256,uint256,string[],string[],uint256[],string[],string[])": "3ab6613a", "registeredLoans(uint256)": "89f75e8a", "renounceRole(bytes32,address)": "36568abe", "revokeRole(bytes32,address)": "d547741f", "supportsInterface(bytes4)": "01ffc9a7", "updateCovenantThreshold(bytes32,string,uint256)": "c3d8b340" },
-  rawMetadata: '{"compiler":{"version":"0.8.33+commit.64118f21"},"language":"Solidity","output":{"abi":[{"inputs":[{"internalType":"address","name":"authorizedWorkflow","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"AccessControlBadConfirmation","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"bytes32","name":"neededRole","type":"bytes32"}],"name":"AccessControlUnauthorizedAccount","type":"error"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"string","name":"covenantName","type":"string"}],"name":"ConvenantNotFound","type":"error"},{"inputs":[],"name":"InvalidCovenantArray","type":"error"},{"inputs":[],"name":"InvalidTokenAddress","type":"error"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"LoanAlreadyRegistered","type":"error"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"LoanNotRegistered","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"string","name":"covenantName","type":"string"},{"indexed":false,"internalType":"uint256","name":"threshold","type":"uint256"},{"indexed":false,"internalType":"string","name":"thresholdType","type":"string"}],"name":"CovenantAdded","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"string","name":"covenantName","type":"string"}],"name":"CovenantDeactivated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"string","name":"covenantName","type":"string"},{"indexed":false,"internalType":"uint256","name":"newThreshold","type":"uint256"}],"name":"CovenantUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":true,"internalType":"address","name":"tokenAddress","type":"address"},{"indexed":false,"internalType":"uint256","name":"principalAmount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"covenantCount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"}],"name":"LoanRegistered","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"role","type":"bytes32"},{"indexed":true,"internalType":"bytes32","name":"previousAdminRole","type":"bytes32"},{"indexed":true,"internalType":"bytes32","name":"newAdminRole","type":"bytes32"}],"name":"RoleAdminChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"role","type":"bytes32"},{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":true,"internalType":"address","name":"sender","type":"address"}],"name":"RoleGranted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"role","type":"bytes32"},{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":true,"internalType":"address","name":"sender","type":"address"}],"name":"RoleRevoked","type":"event"},{"inputs":[],"name":"DEFAULT_ADMIN_ROLE","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"WORKFLOW_ROLE","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"string","name":"covenantName","type":"string"}],"name":"deactivateCovenant","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"string","name":"covenantName","type":"string"}],"name":"getCovenant","outputs":[{"internalType":"string","name":"name","type":"string"},{"internalType":"string","name":"metricDefinition","type":"string"},{"internalType":"uint256","name":"threshold","type":"uint256"},{"internalType":"string","name":"thresholdType","type":"string"},{"internalType":"string","name":"ebitdaAdjustments","type":"string"},{"internalType":"bool","name":"isActive","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"getCovenantNames","outputs":[{"internalType":"string[]","name":"","type":"string[]"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"getLoanSchema","outputs":[{"internalType":"address","name":"tokenAddress","type":"address"},{"internalType":"uint256","name":"principalAmount","type":"uint256"},{"internalType":"uint256","name":"onboardingTimestamp","type":"uint256"},{"internalType":"uint256","name":"reportingFrequency","type":"uint256"},{"internalType":"string[]","name":"covenantNames","type":"string[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getRegisteredLoanCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"}],"name":"getRoleAdmin","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"},{"internalType":"address","name":"account","type":"address"}],"name":"grantRole","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"},{"internalType":"address","name":"account","type":"address"}],"name":"hasRole","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"isLoanRegistered","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"address","name":"tokenAddress","type":"address"},{"internalType":"uint256","name":"principalAmount","type":"uint256"},{"internalType":"uint256","name":"reportingFrequency","type":"uint256"},{"internalType":"string[]","name":"covenantNames","type":"string[]"},{"internalType":"string[]","name":"metricDefinitions","type":"string[]"},{"internalType":"uint256[]","name":"thresholds","type":"uint256[]"},{"internalType":"string[]","name":"thresholdTypes","type":"string[]"},{"internalType":"string[]","name":"ebitdaAdjustments","type":"string[]"}],"name":"registerLoan","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"registeredLoans","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"},{"internalType":"address","name":"callerConfirmation","type":"address"}],"name":"renounceRole","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"},{"internalType":"address","name":"account","type":"address"}],"name":"revokeRole","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes4","name":"interfaceId","type":"bytes4"}],"name":"supportsInterface","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"string","name":"covenantName","type":"string"},{"internalType":"uint256","name":"newThreshold","type":"uint256"}],"name":"updateCovenantThreshold","outputs":[],"stateMutability":"nonpayable","type":"function"}],"devdoc":{"errors":{"AccessControlBadConfirmation()":[{"details":"The caller of a function is not the expected one. NOTE: Don\'t confuse with {AccessControlUnauthorizedAccount}."}],"AccessControlUnauthorizedAccount(address,bytes32)":[{"details":"The `account` is missing a role."}]},"events":{"RoleAdminChanged(bytes32,bytes32,bytes32)":{"details":"Emitted when `newAdminRole` is set as ``role``\'s admin role, replacing `previousAdminRole` `DEFAULT_ADMIN_ROLE` is the starting admin for all roles, despite {RoleAdminChanged} not being emitted to signal this."},"RoleGranted(bytes32,address,address)":{"details":"Emitted when `account` is granted `role`. `sender` is the account that originated the contract call. This account bears the admin role (for the granted role). Expected in cases where the role was granted using the internal {AccessControl-_grantRole}."},"RoleRevoked(bytes32,address,address)":{"details":"Emitted when `account` is revoked `role`. `sender` is the account that originated the contract call:   - if using `revokeRole`, it is the admin role bearer   - if using `renounceRole`, it is the role bearer (i.e. `account`)"}},"kind":"dev","methods":{"getRoleAdmin(bytes32)":{"details":"Returns the admin role that controls `role`. See {grantRole} and {revokeRole}. To change a role\'s admin, use {_setRoleAdmin}."},"grantRole(bytes32,address)":{"details":"Grants `role` to `account`. If `account` had not been already granted `role`, emits a {RoleGranted} event. Requirements: - the caller must have ``role``\'s admin role. May emit a {RoleGranted} event."},"hasRole(bytes32,address)":{"details":"Returns `true` if `account` has been granted `role`."},"registerLoan(bytes32,address,uint256,uint256,string[],string[],uint256[],string[],string[])":{"params":{"covenantNames":"Array of covenant names","ebitdaAdjustments":"Array of EBITDA calculation rules","loanId":"Unique identifier for the loan","metricDefinitions":"Array of metric calculation definitions","principalAmount":"Original loan principal (scaled by 1e18)","reportingFrequency":"How often covenants should be checked (in seconds)","thresholdTypes":"Array of threshold types (\\"MAX\\" or \\"MIN\\")","thresholds":"Array of threshold values (scaled by 1e18)","tokenAddress":"Address of the tokenized loan"}},"renounceRole(bytes32,address)":{"details":"Revokes `role` from the calling account. Roles are often managed via {grantRole} and {revokeRole}: this function\'s purpose is to provide a mechanism for accounts to lose their privileges if they are compromised (such as when a trusted device is misplaced). If the calling account had been revoked `role`, emits a {RoleRevoked} event. Requirements: - the caller must be `callerConfirmation`. May emit a {RoleRevoked} event."},"revokeRole(bytes32,address)":{"details":"Revokes `role` from `account`. If `account` had been granted `role`, emits a {RoleRevoked} event. Requirements: - the caller must have ``role``\'s admin role. May emit a {RoleRevoked} event."},"supportsInterface(bytes4)":{"details":"Returns true if this contract implements the interface defined by `interfaceId`. See the corresponding https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified[ERC section] to learn more about how these ids are created. This function call must use less than 30 000 gas."}},"version":1},"userdoc":{"kind":"user","methods":{"deactivateCovenant(bytes32,string)":{"notice":"Deactivate a covenant (stop monitoring)"},"getCovenant(bytes32,string)":{"notice":"Get specific covenant details"},"getCovenantNames(bytes32)":{"notice":"Get all covenant names for a loan"},"getLoanSchema(bytes32)":{"notice":"Get complete loan schema"},"getRegisteredLoanCount()":{"notice":"Get total number of registered loans"},"isLoanRegistered(bytes32)":{"notice":"Check if a loan is registered"},"registerLoan(bytes32,address,uint256,uint256,string[],string[],uint256[],string[],string[])":{"notice":"Register a new loan with its covenant schema"},"updateCovenantThreshold(bytes32,string,uint256)":{"notice":"Update a covenant threshold"}},"version":1}},"settings":{"compilationTarget":{"src/LoanRegistry.sol":"LoanRegistry"},"evmVersion":"prague","libraries":{},"metadata":{"bytecodeHash":"ipfs"},"optimizer":{"enabled":true,"runs":200},"remappings":[":@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/",":forge-std/=lib/forge-std/src/",":halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/",":openzeppelin-contracts/=lib/openzeppelin-contracts/"],"viaIR":true},"sources":{"lib/openzeppelin-contracts/contracts/access/AccessControl.sol":{"keccak256":"0x1a6b4f6b7798ab80929d491b89d5427a9b3338c0fd1acd0ba325f69c6f1646af","license":"MIT","urls":["bzz-raw://7bb7f346c12a14dc622bc105ce3c47202fbc89f4b153a28a63bb68193297330c","dweb:/ipfs/QmagwF8P3bUBXwdo159ueEnY9dLSvEWwK24kk2op58egwG"]},"lib/openzeppelin-contracts/contracts/access/IAccessControl.sol":{"keccak256":"0xbff9f59c84e5337689161ce7641c0ef8e872d6a7536fbc1f5133f128887aba3c","license":"MIT","urls":["bzz-raw://b308f882e796f7b79c9502deacb0a62983035c6f6f4e962b319ba6a1f4a77d3d","dweb:/ipfs/QmaWCW7ahEQqFjwhSUhV7Ae7WhfNvzSpE7DQ58hvEooqPL"]},"lib/openzeppelin-contracts/contracts/utils/Context.sol":{"keccak256":"0x493033a8d1b176a037b2cc6a04dad01a5c157722049bbecf632ca876224dd4b2","license":"MIT","urls":["bzz-raw://6a708e8a5bdb1011c2c381c9a5cfd8a9a956d7d0a9dc1bd8bcdaf52f76ef2f12","dweb:/ipfs/Qmax9WHBnVsZP46ZxEMNRQpLQnrdE4dK8LehML1Py8FowF"]},"lib/openzeppelin-contracts/contracts/utils/introspection/ERC165.sol":{"keccak256":"0x2d9dc2fe26180f74c11c13663647d38e259e45f95eb88f57b61d2160b0109d3e","license":"MIT","urls":["bzz-raw://81233d1f98060113d9922180bb0f14f8335856fe9f339134b09335e9f678c377","dweb:/ipfs/QmWh6R35SarhAn4z2wH8SU456jJSYL2FgucfTFgbHJJN4E"]},"lib/openzeppelin-contracts/contracts/utils/introspection/IERC165.sol":{"keccak256":"0x8891738ffe910f0cf2da09566928589bf5d63f4524dd734fd9cedbac3274dd5c","license":"MIT","urls":["bzz-raw://971f954442df5c2ef5b5ebf1eb245d7105d9fbacc7386ee5c796df1d45b21617","dweb:/ipfs/QmadRjHbkicwqwwh61raUEapaVEtaLMcYbQZWs9gUkgj3u"]},"src/LoanRegistry.sol":{"keccak256":"0xa96a4cec73b202a9be83db03c22d707d8c96aa237afb03177072b85ba1409706","license":"UNLICENSED","urls":["bzz-raw://6fb548ddd1e20611e4fcb5345510f709a2b6656fc8763a8eb56e9b1f5ad85e40","dweb:/ipfs/QmV7pSRxrAkSg2jaKHnrfjPE4FpfBZ3xWQo8enDnkGfRuw"]}},"version":1}',
-  metadata: { compiler: { version: "0.8.33+commit.64118f21" }, language: "Solidity", output: { abi: [{ inputs: [{ internalType: "address", name: "authorizedWorkflow", type: "address" }], stateMutability: "nonpayable", type: "constructor" }, { inputs: [], type: "error", name: "AccessControlBadConfirmation" }, { inputs: [{ internalType: "address", name: "account", type: "address" }, { internalType: "bytes32", name: "neededRole", type: "bytes32" }], type: "error", name: "AccessControlUnauthorizedAccount" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "string", name: "covenantName", type: "string" }], type: "error", name: "ConvenantNotFound" }, { inputs: [], type: "error", name: "InvalidCovenantArray" }, { inputs: [], type: "error", name: "InvalidTokenAddress" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], type: "error", name: "LoanAlreadyRegistered" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], type: "error", name: "LoanNotRegistered" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "string", name: "covenantName", type: "string", indexed: false }, { internalType: "uint256", name: "threshold", type: "uint256", indexed: false }, { internalType: "string", name: "thresholdType", type: "string", indexed: false }], type: "event", name: "CovenantAdded", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "string", name: "covenantName", type: "string", indexed: false }], type: "event", name: "CovenantDeactivated", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "string", name: "covenantName", type: "string", indexed: false }, { internalType: "uint256", name: "newThreshold", type: "uint256", indexed: false }], type: "event", name: "CovenantUpdated", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "address", name: "tokenAddress", type: "address", indexed: true }, { internalType: "uint256", name: "principalAmount", type: "uint256", indexed: false }, { internalType: "uint256", name: "covenantCount", type: "uint256", indexed: false }, { internalType: "uint256", name: "timestamp", type: "uint256", indexed: false }], type: "event", name: "LoanRegistered", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32", indexed: true }, { internalType: "bytes32", name: "previousAdminRole", type: "bytes32", indexed: true }, { internalType: "bytes32", name: "newAdminRole", type: "bytes32", indexed: true }], type: "event", name: "RoleAdminChanged", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32", indexed: true }, { internalType: "address", name: "account", type: "address", indexed: true }, { internalType: "address", name: "sender", type: "address", indexed: true }], type: "event", name: "RoleGranted", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32", indexed: true }, { internalType: "address", name: "account", type: "address", indexed: true }, { internalType: "address", name: "sender", type: "address", indexed: true }], type: "event", name: "RoleRevoked", anonymous: false }, { inputs: [], stateMutability: "view", type: "function", name: "DEFAULT_ADMIN_ROLE", outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }] }, { inputs: [], stateMutability: "view", type: "function", name: "WORKFLOW_ROLE", outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "string", name: "covenantName", type: "string" }], stateMutability: "nonpayable", type: "function", name: "deactivateCovenant" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "string", name: "covenantName", type: "string" }], stateMutability: "view", type: "function", name: "getCovenant", outputs: [{ internalType: "string", name: "name", type: "string" }, { internalType: "string", name: "metricDefinition", type: "string" }, { internalType: "uint256", name: "threshold", type: "uint256" }, { internalType: "string", name: "thresholdType", type: "string" }, { internalType: "string", name: "ebitdaAdjustments", type: "string" }, { internalType: "bool", name: "isActive", type: "bool" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "view", type: "function", name: "getCovenantNames", outputs: [{ internalType: "string[]", name: "", type: "string[]" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "view", type: "function", name: "getLoanSchema", outputs: [{ internalType: "address", name: "tokenAddress", type: "address" }, { internalType: "uint256", name: "principalAmount", type: "uint256" }, { internalType: "uint256", name: "onboardingTimestamp", type: "uint256" }, { internalType: "uint256", name: "reportingFrequency", type: "uint256" }, { internalType: "string[]", name: "covenantNames", type: "string[]" }] }, { inputs: [], stateMutability: "view", type: "function", name: "getRegisteredLoanCount", outputs: [{ internalType: "uint256", name: "", type: "uint256" }] }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32" }], stateMutability: "view", type: "function", name: "getRoleAdmin", outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }] }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32" }, { internalType: "address", name: "account", type: "address" }], stateMutability: "nonpayable", type: "function", name: "grantRole" }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32" }, { internalType: "address", name: "account", type: "address" }], stateMutability: "view", type: "function", name: "hasRole", outputs: [{ internalType: "bool", name: "", type: "bool" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "view", type: "function", name: "isLoanRegistered", outputs: [{ internalType: "bool", name: "", type: "bool" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "address", name: "tokenAddress", type: "address" }, { internalType: "uint256", name: "principalAmount", type: "uint256" }, { internalType: "uint256", name: "reportingFrequency", type: "uint256" }, { internalType: "string[]", name: "covenantNames", type: "string[]" }, { internalType: "string[]", name: "metricDefinitions", type: "string[]" }, { internalType: "uint256[]", name: "thresholds", type: "uint256[]" }, { internalType: "string[]", name: "thresholdTypes", type: "string[]" }, { internalType: "string[]", name: "ebitdaAdjustments", type: "string[]" }], stateMutability: "nonpayable", type: "function", name: "registerLoan" }, { inputs: [{ internalType: "uint256", name: "", type: "uint256" }], stateMutability: "view", type: "function", name: "registeredLoans", outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }] }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32" }, { internalType: "address", name: "callerConfirmation", type: "address" }], stateMutability: "nonpayable", type: "function", name: "renounceRole" }, { inputs: [{ internalType: "bytes32", name: "role", type: "bytes32" }, { internalType: "address", name: "account", type: "address" }], stateMutability: "nonpayable", type: "function", name: "revokeRole" }, { inputs: [{ internalType: "bytes4", name: "interfaceId", type: "bytes4" }], stateMutability: "view", type: "function", name: "supportsInterface", outputs: [{ internalType: "bool", name: "", type: "bool" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "string", name: "covenantName", type: "string" }, { internalType: "uint256", name: "newThreshold", type: "uint256" }], stateMutability: "nonpayable", type: "function", name: "updateCovenantThreshold" }], devdoc: { kind: "dev", methods: { "getRoleAdmin(bytes32)": { details: "Returns the admin role that controls `role`. See {grantRole} and {revokeRole}. To change a role's admin, use {_setRoleAdmin}." }, "grantRole(bytes32,address)": { details: "Grants `role` to `account`. If `account` had not been already granted `role`, emits a {RoleGranted} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleGranted} event." }, "hasRole(bytes32,address)": { details: "Returns `true` if `account` has been granted `role`." }, "registerLoan(bytes32,address,uint256,uint256,string[],string[],uint256[],string[],string[])": { params: { covenantNames: "Array of covenant names", ebitdaAdjustments: "Array of EBITDA calculation rules", loanId: "Unique identifier for the loan", metricDefinitions: "Array of metric calculation definitions", principalAmount: "Original loan principal (scaled by 1e18)", reportingFrequency: "How often covenants should be checked (in seconds)", thresholdTypes: 'Array of threshold types ("MAX" or "MIN")', thresholds: "Array of threshold values (scaled by 1e18)", tokenAddress: "Address of the tokenized loan" } }, "renounceRole(bytes32,address)": { details: "Revokes `role` from the calling account. Roles are often managed via {grantRole} and {revokeRole}: this function's purpose is to provide a mechanism for accounts to lose their privileges if they are compromised (such as when a trusted device is misplaced). If the calling account had been revoked `role`, emits a {RoleRevoked} event. Requirements: - the caller must be `callerConfirmation`. May emit a {RoleRevoked} event." }, "revokeRole(bytes32,address)": { details: "Revokes `role` from `account`. If `account` had been granted `role`, emits a {RoleRevoked} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleRevoked} event." }, "supportsInterface(bytes4)": { details: "Returns true if this contract implements the interface defined by `interfaceId`. See the corresponding https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified[ERC section] to learn more about how these ids are created. This function call must use less than 30 000 gas." } }, version: 1 }, userdoc: { kind: "user", methods: { "deactivateCovenant(bytes32,string)": { notice: "Deactivate a covenant (stop monitoring)" }, "getCovenant(bytes32,string)": { notice: "Get specific covenant details" }, "getCovenantNames(bytes32)": { notice: "Get all covenant names for a loan" }, "getLoanSchema(bytes32)": { notice: "Get complete loan schema" }, "getRegisteredLoanCount()": { notice: "Get total number of registered loans" }, "isLoanRegistered(bytes32)": { notice: "Check if a loan is registered" }, "registerLoan(bytes32,address,uint256,uint256,string[],string[],uint256[],string[],string[])": { notice: "Register a new loan with its covenant schema" }, "updateCovenantThreshold(bytes32,string,uint256)": { notice: "Update a covenant threshold" } }, version: 1 } }, settings: { remappings: ["@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/", "erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/", "forge-std/=lib/forge-std/src/", "halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/", "openzeppelin-contracts/=lib/openzeppelin-contracts/"], optimizer: { enabled: true, runs: 200 }, metadata: { bytecodeHash: "ipfs" }, compilationTarget: { "src/LoanRegistry.sol": "LoanRegistry" }, evmVersion: "prague", libraries: {}, viaIR: true }, sources: { "lib/openzeppelin-contracts/contracts/access/AccessControl.sol": { keccak256: "0x1a6b4f6b7798ab80929d491b89d5427a9b3338c0fd1acd0ba325f69c6f1646af", urls: ["bzz-raw://7bb7f346c12a14dc622bc105ce3c47202fbc89f4b153a28a63bb68193297330c", "dweb:/ipfs/QmagwF8P3bUBXwdo159ueEnY9dLSvEWwK24kk2op58egwG"], license: "MIT" }, "lib/openzeppelin-contracts/contracts/access/IAccessControl.sol": { keccak256: "0xbff9f59c84e5337689161ce7641c0ef8e872d6a7536fbc1f5133f128887aba3c", urls: ["bzz-raw://b308f882e796f7b79c9502deacb0a62983035c6f6f4e962b319ba6a1f4a77d3d", "dweb:/ipfs/QmaWCW7ahEQqFjwhSUhV7Ae7WhfNvzSpE7DQ58hvEooqPL"], license: "MIT" }, "lib/openzeppelin-contracts/contracts/utils/Context.sol": { keccak256: "0x493033a8d1b176a037b2cc6a04dad01a5c157722049bbecf632ca876224dd4b2", urls: ["bzz-raw://6a708e8a5bdb1011c2c381c9a5cfd8a9a956d7d0a9dc1bd8bcdaf52f76ef2f12", "dweb:/ipfs/Qmax9WHBnVsZP46ZxEMNRQpLQnrdE4dK8LehML1Py8FowF"], license: "MIT" }, "lib/openzeppelin-contracts/contracts/utils/introspection/ERC165.sol": { keccak256: "0x2d9dc2fe26180f74c11c13663647d38e259e45f95eb88f57b61d2160b0109d3e", urls: ["bzz-raw://81233d1f98060113d9922180bb0f14f8335856fe9f339134b09335e9f678c377", "dweb:/ipfs/QmWh6R35SarhAn4z2wH8SU456jJSYL2FgucfTFgbHJJN4E"], license: "MIT" }, "lib/openzeppelin-contracts/contracts/utils/introspection/IERC165.sol": { keccak256: "0x8891738ffe910f0cf2da09566928589bf5d63f4524dd734fd9cedbac3274dd5c", urls: ["bzz-raw://971f954442df5c2ef5b5ebf1eb245d7105d9fbacc7386ee5c796df1d45b21617", "dweb:/ipfs/QmadRjHbkicwqwwh61raUEapaVEtaLMcYbQZWs9gUkgj3u"], license: "MIT" }, "src/LoanRegistry.sol": { keccak256: "0xa96a4cec73b202a9be83db03c22d707d8c96aa237afb03177072b85ba1409706", urls: ["bzz-raw://6fb548ddd1e20611e4fcb5345510f709a2b6656fc8763a8eb56e9b1f5ad85e40", "dweb:/ipfs/QmV7pSRxrAkSg2jaKHnrfjPE4FpfBZ3xWQo8enDnkGfRuw"], license: "UNLICENSED" } }, version: 1 },
-  id: 23
+  abi: [{ type: "constructor", inputs: [{ name: "_expectedAuthor", type: "address", internalType: "address" }, { name: "_expectedWorkflowName", type: "bytes10", internalType: "bytes10" }], stateMutability: "nonpayable" }, { type: "function", name: "EXPECTED_AUTHOR", inputs: [], outputs: [{ name: "", type: "address", internalType: "address" }], stateMutability: "view" }, { type: "function", name: "EXPECTED_WORKFLOW_NAME", inputs: [], outputs: [{ name: "", type: "bytes10", internalType: "bytes10" }], stateMutability: "view" }, { type: "function", name: "deactivateCovenant", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "covenantName", type: "string", internalType: "string" }], outputs: [], stateMutability: "nonpayable" }, { type: "function", name: "getCovenant", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "covenantName", type: "string", internalType: "string" }], outputs: [{ name: "name", type: "string", internalType: "string" }, { name: "metricDefinition", type: "string", internalType: "string" }, { name: "threshold", type: "uint256", internalType: "uint256" }, { name: "thresholdType", type: "string", internalType: "string" }, { name: "ebitdaAdjustments", type: "string", internalType: "string" }, { name: "isActive", type: "bool", internalType: "bool" }], stateMutability: "view" }, { type: "function", name: "getCovenantNames", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "string[]", internalType: "string[]" }], stateMutability: "view" }, { type: "function", name: "getLoanSchema", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "tokenAddress", type: "address", internalType: "address" }, { name: "principalAmount", type: "uint256", internalType: "uint256" }, { name: "onboardingTimestamp", type: "uint256", internalType: "uint256" }, { name: "reportingFrequency", type: "uint256", internalType: "uint256" }, { name: "covenantNames", type: "string[]", internalType: "string[]" }], stateMutability: "view" }, { type: "function", name: "getRegisteredLoanCount", inputs: [], outputs: [{ name: "", type: "uint256", internalType: "uint256" }], stateMutability: "view" }, { type: "function", name: "isLoanRegistered", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "bool", internalType: "bool" }], stateMutability: "view" }, { type: "function", name: "onReport", inputs: [{ name: "metadata", type: "bytes", internalType: "bytes" }, { name: "report", type: "bytes", internalType: "bytes" }], outputs: [], stateMutability: "nonpayable" }, { type: "function", name: "registeredLoans", inputs: [{ name: "", type: "uint256", internalType: "uint256" }], outputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], stateMutability: "view" }, { type: "function", name: "supportsInterface", inputs: [{ name: "interfaceId", type: "bytes4", internalType: "bytes4" }], outputs: [{ name: "", type: "bool", internalType: "bool" }], stateMutability: "pure" }, { type: "function", name: "updateCovenantThreshold", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "covenantName", type: "string", internalType: "string" }, { name: "newThreshold", type: "uint256", internalType: "uint256" }], outputs: [], stateMutability: "nonpayable" }, { type: "event", name: "CovenantAdded", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "covenantName", type: "string", indexed: false, internalType: "string" }, { name: "threshold", type: "uint256", indexed: false, internalType: "uint256" }, { name: "thresholdType", type: "string", indexed: false, internalType: "string" }], anonymous: false }, { type: "event", name: "CovenantDeactivated", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "covenantName", type: "string", indexed: false, internalType: "string" }], anonymous: false }, { type: "event", name: "CovenantUpdated", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "covenantName", type: "string", indexed: false, internalType: "string" }, { name: "newThreshold", type: "uint256", indexed: false, internalType: "uint256" }], anonymous: false }, { type: "event", name: "LoanRegistered", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "tokenAddress", type: "address", indexed: true, internalType: "address" }, { name: "principalAmount", type: "uint256", indexed: false, internalType: "uint256" }, { name: "covenantCount", type: "uint256", indexed: false, internalType: "uint256" }, { name: "timestamp", type: "uint256", indexed: false, internalType: "uint256" }], anonymous: false }, { type: "error", name: "ConvenantNotFound", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "covenantName", type: "string", internalType: "string" }] }, { type: "error", name: "InvalidAuthor", inputs: [{ name: "received", type: "address", internalType: "address" }, { name: "expected", type: "address", internalType: "address" }] }, { type: "error", name: "InvalidCovenantArray", inputs: [] }, { type: "error", name: "InvalidTokenAddress", inputs: [] }, { type: "error", name: "InvalidWorkflowName", inputs: [{ name: "received", type: "bytes10", internalType: "bytes10" }, { name: "expected", type: "bytes10", internalType: "bytes10" }] }, { type: "error", name: "LoanAlreadyRegistered", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }] }, { type: "error", name: "LoanNotRegistered", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }] }],
+  bytecode: { object: "0x60c034608757601f610fca38819003918201601f19168301916001600160401b03831184841017608b5780849260409485528339810103126087578051906001600160a01b038216820360875760200151906001600160b01b03198216820360875760805260a052604051610f2a90816100a08239608051816108d8015260a0518160b20152f35b5f80fd5b634e487b7160e01b5f52604160045260245ffdfe60806040526004361015610011575f80fd5b5f3560e01c80630137f4931461099b57806301ffc9a71461095457806351d274de146109075780635780bd93146108c3578063805f21321461042357806389f75e8a146103eb5780638aa1fef7146103425780638bb7e473146103255780638ef5c48d146101ee578063bc09792f146101bd578063c3d8b340146100e65763d71d79fe1461009d575f80fd5b346100e2575f3660031901126100e2576040517f00000000000000000000000000000000000000000000000000000000000000006001600160b01b0319168152602090f35b5f80fd5b346100e25760603660031901126100e2576004356024356001600160401b0381116100e257610119903690600401610a94565b91906044359261012883610cdf565b825f525f602052610140600660405f20018284610c8c565b9361014b8554610b5f565b1561019a578060027f2c0c38f77f6e07d8cdab906f404dbca1bf502456d9730e24e48004198a776e719596015561018f604051938493604085526040850191610ca5565b9060208301520390a2005b5060405163b93204b760e01b81529182916101b9918560048501610cc5565b0390fd5b346100e25760203660031901126100e2576004355f525f602052602060ff600760405f200154166040519015158152f35b346100e2576101fc36610ad9565b919061020782610cdf565b815f525f60205261021f600660405f20018483610c8c565b916040519261022d84610b0c565b61023681610b97565b845261024460018201610b97565b93602081019485526002820154936040820194855261026560038401610b97565b936060830194855260ff600561027d60048701610b97565b95608086019687520154169760a08401981515895283515115610308575050506102fe926102cf96926102dd6102f0935197519651925191519451151596604051998a9960c08b5260c08b0190610a18565b9089820360208b0152610a18565b9160408801528682036060880152610a18565b908482036080860152610a18565b9060a08301520390f35b6101b99060405193849363b93204b760e01b855260048501610cc5565b346100e2575f3660031901126100e2576020600154604051908152f35b346100e25761035036610ad9565b919061035b82610cdf565b815f525f602052610373600660405f20018483610c8c565b9261037e8454610b5f565b156103cd5760057f277d87b869727f9eaea1381ffc63a3674cba7eef4e2009d7d4b95c4b6ffb3b2193940160ff1981541690556103c8604051928392602084526020840191610ca5565b0390a2005b60405163b93204b760e01b81529182916101b9918560048501610cc5565b346100e25760203660031901126100e2576004356001548110156100e257610414602091610ac1565b90549060031b1c604051908152f35b346100e25760403660031901126100e2576004356001600160401b0381116100e257610453903690600401610a94565b50506024356001600160401b0381116100e257610474903690600401610a94565b810190610120818303126100e25760208101356001600160a01b03811692823592918490036100e25760408201359060808301356001600160401b0381116100e257816104c2918501610d0b565b9160a08401356001600160401b0381116100e257826104e2918601610d0b565b9260c08501356001600160401b0381116100e25785019183601f840112156100e25782359261051084610b48565b9361051e6040519586610b27565b80855260208086019160051b830101918683116100e257602001905b8282106108b35750505060e08601356001600160401b0381116100e25784610563918801610d0b565b93610100870135906001600160401b0382116100e257610584918801610d0b565b90875f525f60205260ff600760405f200154166108a05788156108915782511561085e5782518651811490811591610885575b8115610879575b811561086d575b5061085e5797875f525f602052606060405f209789895560018901836bffffffffffffffffffffffff60a01b8254161790558a60028a01554260038a01550135600488015560078701600160ff198254161790555f906006600589019801915b84518110156107ed576106388186610dd2565b518954600160401b8110156107d95760018101808c558110156107c5578a5f5260205f20019061066791610de6565b6106718186610dd2565b5161067c828a610dd2565b51906106888389610dd2565b51610693848b610dd2565b5161069e8589610dd2565b5191604051936106ad85610b0c565b84526020840194855260408401908152606084019182526080840192835260a0840194600186526106de878c610dd2565b51604051818192516020819201835e81018b815203602001902094516107049086610de6565b516107129060018601610de6565b516002840155516107269060038401610de6565b516107349060048301610de6565b6005019051151560ff198254169060ff16179055896107538287610dd2565b5161075e8389610dd2565b519061076a848b610dd2565b51604051928392606084526060840161078291610a18565b906020840152828103604084015261079991610a18565b037fe179c7aea0ef47bb61c5502f5a87afaa640dd4f4c97d6e1be84fa1c7e97fa98491a2600101610625565b634e487b7160e01b5f52603260045260245ffd5b634e487b7160e01b5f52604160045260245ffd5b5088848b60015490600160401b8210156107d9577f25bee5063b2a922264e207d82efab5ad6b05550795e0f26ba6fe05cd7077543b9261083583600160609501600155610ac1565b81549060031b9087821b915f19901b1916179055516040519182526020820152426040820152a3005b630ffa118160e01b5f5260045ffd5b9050825114158a6105c5565b865181141591506105be565b855181141591506105b7565b630f58058360e11b5f5260045ffd5b8763c343b2ef60e01b5f5260045260245ffd5b813581526020918201910161053a565b346100e2575f3660031901126100e2576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b346100e25760203660031901126100e25760043561092481610cdf565b5f525f60205261095061093c600560405f2001610c37565b604051918291602083526020830190610a3c565b0390f35b346100e25760203660031901126100e25760043563ffffffff60e01b81168091036100e25760209063402f909960e11b148015610996575b6040519015158152f35b61098c565b346100e25760203660031901126100e2576004356109b881610cdf565b5f525f60205260405f2060018060a01b036001820154166109506002830154926003810154906109ef600560048301549201610c37565b91604051958695865260208601526040850152606084015260a0608084015260a0830190610a3c565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b9080602083519182815201916020808360051b8301019401925f915b838310610a6757505050505090565b9091929394602080610a85600193601f198682030187528951610a18565b97019301930191939290610a58565b9181601f840112156100e2578235916001600160401b0383116100e257602083818601950101116100e257565b6001548110156107c55760015f5260205f2001905f90565b9060406003198301126100e25760043591602435906001600160401b0382116100e257610b0891600401610a94565b9091565b60c081019081106001600160401b038211176107d957604052565b90601f801991011681019081106001600160401b038211176107d957604052565b6001600160401b0381116107d95760051b60200190565b90600182811c92168015610b8d575b6020831014610b7957565b634e487b7160e01b5f52602260045260245ffd5b91607f1691610b6e565b9060405191825f825492610baa84610b5f565b8084529360018116908115610c155750600114610bd1575b50610bcf92500383610b27565b565b90505f9291925260205f20905f915b818310610bf9575050906020610bcf928201015f610bc2565b6020919350806001915483858901015201910190918492610be0565b905060209250610bcf94915060ff191682840152151560051b8201015f610bc2565b908154610c4381610b48565b92610c516040519485610b27565b81845260208401905f5260205f205f915b838310610c6f5750505050565b600160208192610c7e85610b97565b815201920192019190610c62565b6020919283604051948593843782019081520301902090565b908060209392818452848401375f828201840152601f01601f1916010190565b604090610cdc949281528160208201520191610ca5565b90565b805f525f60205260ff600760405f2001541615610cf95750565b634607cd3160e11b5f5260045260245ffd5b9080601f830112156100e257813591610d2383610b48565b92610d316040519485610b27565b80845260208085019160051b830101918383116100e25760208101915b838310610d5d57505050505090565b82356001600160401b0381116100e257820185603f820112156100e2576020810135916001600160401b0383116107d957604051610da5601f8501601f191660200182610b27565b83815260408385010188106100e2575f602085819660408397018386013783010152815201920191610d4e565b80518210156107c55760209160051b010190565b91909182516001600160401b0381116107d957610e038254610b5f565b601f8111610ea3575b506020601f8211600114610e4557819293945f92610e3a575b50508160011b915f199060031b1c1916179055565b015190505f80610e25565b601f19821690835f52805f20915f5b818110610e8b57509583600195969710610e73575b505050811b019055565b01515f1960f88460031b161c191690555f8080610e69565b9192602060018192868b015181550194019201610e54565b81811115610e0c57825f5260205f20601f830160051c9060208410610eec575b81601f9101920160051c03905f5b828110610edf575050610e0c565b5f82820155600101610ed1565b5f9150610ec356fea26469706673582212200076017e31d3594afa70d13c4fef8d7bb677c56ad335626640f9c373b91cecc164736f6c63430008210033", sourceMap: "136:10391:17:-:0;;;;;;;;;;;;;-1:-1:-1;;136:10391:17;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;;-1:-1:-1;;;;;;136:10391:17;;;;;;612:32:18;;654:45;;136:10391:17;;;;;;;;612:32:18;136:10391:17;;;;;654:45:18;136:10391:17;;;;;;;-1:-1:-1;136:10391:17;;;;;;-1:-1:-1;136:10391:17;;;;;-1:-1:-1;136:10391:17", linkReferences: {} },
+  deployedBytecode: { object: "0x60806040526004361015610011575f80fd5b5f3560e01c80630137f4931461099b57806301ffc9a71461095457806351d274de146109075780635780bd93146108c3578063805f21321461042357806389f75e8a146103eb5780638aa1fef7146103425780638bb7e473146103255780638ef5c48d146101ee578063bc09792f146101bd578063c3d8b340146100e65763d71d79fe1461009d575f80fd5b346100e2575f3660031901126100e2576040517f00000000000000000000000000000000000000000000000000000000000000006001600160b01b0319168152602090f35b5f80fd5b346100e25760603660031901126100e2576004356024356001600160401b0381116100e257610119903690600401610a94565b91906044359261012883610cdf565b825f525f602052610140600660405f20018284610c8c565b9361014b8554610b5f565b1561019a578060027f2c0c38f77f6e07d8cdab906f404dbca1bf502456d9730e24e48004198a776e719596015561018f604051938493604085526040850191610ca5565b9060208301520390a2005b5060405163b93204b760e01b81529182916101b9918560048501610cc5565b0390fd5b346100e25760203660031901126100e2576004355f525f602052602060ff600760405f200154166040519015158152f35b346100e2576101fc36610ad9565b919061020782610cdf565b815f525f60205261021f600660405f20018483610c8c565b916040519261022d84610b0c565b61023681610b97565b845261024460018201610b97565b93602081019485526002820154936040820194855261026560038401610b97565b936060830194855260ff600561027d60048701610b97565b95608086019687520154169760a08401981515895283515115610308575050506102fe926102cf96926102dd6102f0935197519651925191519451151596604051998a9960c08b5260c08b0190610a18565b9089820360208b0152610a18565b9160408801528682036060880152610a18565b908482036080860152610a18565b9060a08301520390f35b6101b99060405193849363b93204b760e01b855260048501610cc5565b346100e2575f3660031901126100e2576020600154604051908152f35b346100e25761035036610ad9565b919061035b82610cdf565b815f525f602052610373600660405f20018483610c8c565b9261037e8454610b5f565b156103cd5760057f277d87b869727f9eaea1381ffc63a3674cba7eef4e2009d7d4b95c4b6ffb3b2193940160ff1981541690556103c8604051928392602084526020840191610ca5565b0390a2005b60405163b93204b760e01b81529182916101b9918560048501610cc5565b346100e25760203660031901126100e2576004356001548110156100e257610414602091610ac1565b90549060031b1c604051908152f35b346100e25760403660031901126100e2576004356001600160401b0381116100e257610453903690600401610a94565b50506024356001600160401b0381116100e257610474903690600401610a94565b810190610120818303126100e25760208101356001600160a01b03811692823592918490036100e25760408201359060808301356001600160401b0381116100e257816104c2918501610d0b565b9160a08401356001600160401b0381116100e257826104e2918601610d0b565b9260c08501356001600160401b0381116100e25785019183601f840112156100e25782359261051084610b48565b9361051e6040519586610b27565b80855260208086019160051b830101918683116100e257602001905b8282106108b35750505060e08601356001600160401b0381116100e25784610563918801610d0b565b93610100870135906001600160401b0382116100e257610584918801610d0b565b90875f525f60205260ff600760405f200154166108a05788156108915782511561085e5782518651811490811591610885575b8115610879575b811561086d575b5061085e5797875f525f602052606060405f209789895560018901836bffffffffffffffffffffffff60a01b8254161790558a60028a01554260038a01550135600488015560078701600160ff198254161790555f906006600589019801915b84518110156107ed576106388186610dd2565b518954600160401b8110156107d95760018101808c558110156107c5578a5f5260205f20019061066791610de6565b6106718186610dd2565b5161067c828a610dd2565b51906106888389610dd2565b51610693848b610dd2565b5161069e8589610dd2565b5191604051936106ad85610b0c565b84526020840194855260408401908152606084019182526080840192835260a0840194600186526106de878c610dd2565b51604051818192516020819201835e81018b815203602001902094516107049086610de6565b516107129060018601610de6565b516002840155516107269060038401610de6565b516107349060048301610de6565b6005019051151560ff198254169060ff16179055896107538287610dd2565b5161075e8389610dd2565b519061076a848b610dd2565b51604051928392606084526060840161078291610a18565b906020840152828103604084015261079991610a18565b037fe179c7aea0ef47bb61c5502f5a87afaa640dd4f4c97d6e1be84fa1c7e97fa98491a2600101610625565b634e487b7160e01b5f52603260045260245ffd5b634e487b7160e01b5f52604160045260245ffd5b5088848b60015490600160401b8210156107d9577f25bee5063b2a922264e207d82efab5ad6b05550795e0f26ba6fe05cd7077543b9261083583600160609501600155610ac1565b81549060031b9087821b915f19901b1916179055516040519182526020820152426040820152a3005b630ffa118160e01b5f5260045ffd5b9050825114158a6105c5565b865181141591506105be565b855181141591506105b7565b630f58058360e11b5f5260045ffd5b8763c343b2ef60e01b5f5260045260245ffd5b813581526020918201910161053a565b346100e2575f3660031901126100e2576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b346100e25760203660031901126100e25760043561092481610cdf565b5f525f60205261095061093c600560405f2001610c37565b604051918291602083526020830190610a3c565b0390f35b346100e25760203660031901126100e25760043563ffffffff60e01b81168091036100e25760209063402f909960e11b148015610996575b6040519015158152f35b61098c565b346100e25760203660031901126100e2576004356109b881610cdf565b5f525f60205260405f2060018060a01b036001820154166109506002830154926003810154906109ef600560048301549201610c37565b91604051958695865260208601526040850152606084015260a0608084015260a0830190610a3c565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b9080602083519182815201916020808360051b8301019401925f915b838310610a6757505050505090565b9091929394602080610a85600193601f198682030187528951610a18565b97019301930191939290610a58565b9181601f840112156100e2578235916001600160401b0383116100e257602083818601950101116100e257565b6001548110156107c55760015f5260205f2001905f90565b9060406003198301126100e25760043591602435906001600160401b0382116100e257610b0891600401610a94565b9091565b60c081019081106001600160401b038211176107d957604052565b90601f801991011681019081106001600160401b038211176107d957604052565b6001600160401b0381116107d95760051b60200190565b90600182811c92168015610b8d575b6020831014610b7957565b634e487b7160e01b5f52602260045260245ffd5b91607f1691610b6e565b9060405191825f825492610baa84610b5f565b8084529360018116908115610c155750600114610bd1575b50610bcf92500383610b27565b565b90505f9291925260205f20905f915b818310610bf9575050906020610bcf928201015f610bc2565b6020919350806001915483858901015201910190918492610be0565b905060209250610bcf94915060ff191682840152151560051b8201015f610bc2565b908154610c4381610b48565b92610c516040519485610b27565b81845260208401905f5260205f205f915b838310610c6f5750505050565b600160208192610c7e85610b97565b815201920192019190610c62565b6020919283604051948593843782019081520301902090565b908060209392818452848401375f828201840152601f01601f1916010190565b604090610cdc949281528160208201520191610ca5565b90565b805f525f60205260ff600760405f2001541615610cf95750565b634607cd3160e11b5f5260045260245ffd5b9080601f830112156100e257813591610d2383610b48565b92610d316040519485610b27565b80845260208085019160051b830101918383116100e25760208101915b838310610d5d57505050505090565b82356001600160401b0381116100e257820185603f820112156100e2576020810135916001600160401b0383116107d957604051610da5601f8501601f191660200182610b27565b83815260408385010188106100e2575f602085819660408397018386013783010152815201920191610d4e565b80518210156107c55760209160051b010190565b91909182516001600160401b0381116107d957610e038254610b5f565b601f8111610ea3575b506020601f8211600114610e4557819293945f92610e3a575b50508160011b915f199060031b1c1916179055565b015190505f80610e25565b601f19821690835f52805f20915f5b818110610e8b57509583600195969710610e73575b505050811b019055565b01515f1960f88460031b161c191690555f8080610e69565b9192602060018192868b015181550194019201610e54565b81811115610e0c57825f5260205f20601f830160051c9060208410610eec575b81601f9101920160051c03905f5b828110610edf575050610e0c565b5f82820155600101610ed1565b5f9150610ec356fea26469706673582212200076017e31d3594afa70d13c4fef8d7bb677c56ad335626640f9c373b91cecc164736f6c63430008210033", sourceMap: "136:10391:17:-:0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:10391:17;;;;;;353:47:18;-1:-1:-1;;;;;;136:10391:17;;;;;;;;;;;;;;;;-1:-1:-1;;136:10391:17;;;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;;;:::i;:::-;;;;;2257:6;;;;:::i;:::-;136:10391;;;;;;;6871:29;136:10391;;;6871:29;136:10391;;;:::i;:::-;;;;;;:::i;:::-;6928:32;6924:109;;7051:18;;7099:51;7051:18;;;136:10391;;;;;;;;;;;;;;;:::i;:::-;;;;;;7099:51;;;136:10391;6924:109;-1:-1:-1;136:10391:17;;-1:-1:-1;;;6983:39:17;;136:10391;;;6983:39;;136:10391;;6983:39;;;:::i;:::-;;;;136:10391;;;;;;-1:-1:-1;;136:10391:17;;;;;;;;;;;;;9819:26;136:10391;;;9819:26;136:10391;;;;;;;;;;;;;;;;;:::i;:::-;2257:6;;;;;:::i;:::-;136:10391;;;;;;;8802:29;136:10391;;;8802:29;136:10391;;;:::i;:::-;;;;;;;;:::i;:::-;;;;:::i;:::-;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;8865:13;;136:10391;8859:32;8855:109;;9003:13;;;136:10391;9003:13;136:10391;9003:13;;136:10391;;9003:13;;9030:25;;136:10391;;9101:22;;9137:26;;136:10391;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;:::i;:::-;;;;;;;;;8855:109;8914:39;136:10391;;;7510:39;;;;;;8914;;136:10391;8914:39;;;:::i;136:10391::-;;;;;;-1:-1:-1;;136:10391:17;;;;;9633:15;136:10391;;;;;;;;;;;;;;:::i;:::-;2257:6;;;;;:::i;:::-;136:10391;;;;;;;7398:29;136:10391;;;7398:29;136:10391;;;:::i;:::-;;;;;;:::i;:::-;7455:32;7451:109;;7578:17;7618:41;7578:17;;;136:10391;;;;;;;;;;;;;;;;;;;;;:::i;:::-;7618:41;;;136:10391;7451:109;136:10391;;-1:-1:-1;;;7510:39:17;;136:10391;;;7510:39;;136:10391;;7510:39;;;:::i;136:10391::-;;;;;;-1:-1:-1;;136:10391:17;;;;;;;;1356:32;;;;;;136:10391;1356:32;;:::i;:::-;136:10391;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:10391:17;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;;;:::i;:::-;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;;;:::i;:::-;3357:142;;136:10391;;;;;;;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;;:::i;:::-;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;;:::i;:::-;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;;:::i;:::-;;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;:::i;:::-;;;;;;;;;4848:26;136:10391;;;4848:26;136:10391;;4844:93;;4950:26;;4946:85;;136:10391;;5044:25;5040:85;;136:10391;;;;5151:48;;;;;:105;;;136:10391;5151:166;;;;136:10391;5151:230;;;;136:10391;5134:312;;;136:10391;;;;;;;;;;;;;;;;5553:19;;136:10391;;;;;;;;;;5597:22;;;;136:10391;5676:15;5647:26;;;136:10391;;;;5701:25;;136:10391;4848:26;5757:13;;136:10391;;;;;;;;;;5861:20;5918:16;136:10391;5861:20;;5918:16;;5796:576;5842:3;136:10391;;5816:24;;;;;5887:16;;;;:::i;:::-;;136:10391;;-1:-1:-1;;;136:10391:17;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;5988:16;;;;:::i;:::-;;6040:20;;;;:::i;:::-;;6089:13;;;;;:::i;:::-;136:10391;6135:17;;;;:::i;:::-;;6189:20;;;;:::i;:::-;;136:10391;;;;;;;:::i;:::-;;;;5955:301;;136:10391;;;;5955:301;;136:10391;;;;5955:301;;136:10391;;;;5955:301;;136:10391;;;;5955:301;;136:10391;;;;5935:16;;;;:::i;:::-;;136:10391;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;:::i;:::-;;5597:22;136:10391;;;;;;5647:26;136:10391;;;:::i;:::-;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;6310:16;;;;;:::i;:::-;;6328:13;;;;:::i;:::-;136:10391;6343:17;;;;;:::i;:::-;;136:10391;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;:::i;:::-;6288:73;;;;136:10391;;5801:13;;136:10391;;;;;;;;;;;;;;;;;;;;;;;;5816:24;;;;;136:10391;;;-1:-1:-1;;;136:10391:17;;;;;6442:162;136:10391;;;;;;;;;;:::i;:::-;;;;5647:26;136:10391;;;;;;;;;;;;;;;;;;;;;;;;;5676:15;136:10391;;;;6442:162;136:10391;5134:312;5092:22;;;136:10391;5413:22;136:10391;;5413:22;5151:230;136:10391;;;;5333:48;;5151:230;;;:166;136:10391;;5272:45;;;;-1:-1:-1;5151:166:17;;:105;136:10391;;5215:41;;;;-1:-1:-1;5151:105:17;;4946:85;4999:21;;;136:10391;4999:21;136:10391;;4999:21;4844:93;4897:29;;;;136:10391;4897:29;136:10391;;;;4897:29;136:10391;;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:10391:17;;;;;;307:40:18;-1:-1:-1;;;;;136:10391:17;;;;;;;;;;;;-1:-1:-1;;136:10391:17;;;;;;2257:6;;;:::i;:::-;136:10391;;;;;;;9434:33;136:10391;;;9434:33;136:10391;:::i;:::-;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;-1:-1:-1;;136:10391:17;;;;;;;;;;;;;;;;;;-1:-1:-1;;;10441:37:17;:77;;;;136:10391;;;;;;;;;10441:77;;;136:10391;;;;;;-1:-1:-1;;136:10391:17;;;;;;2257:6;;;:::i;:::-;136:10391;;;;;;;;;;;;;;8136:19;;136:10391;;;8169:22;;;136:10391;8205:26;;;;136:10391;8245:25;136:10391;8284:20;136:10391;8245:25;;136:10391;8284:20;;136:10391;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;-1:-1:-1;136:10391:17;;;;;;;;-1:-1:-1;;136:10391:17;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;136:10391:17;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;;;;;;;:::o;:::-;5553:19;136:10391;;;;;;5553:19;-1:-1:-1;136:10391:17;;-1:-1:-1;136:10391:17;;;-1:-1:-1;136:10391:17;:::o;:::-;;;-1:-1:-1;;136:10391:17;;;;;;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;:::i;:::-;;;:::o;:::-;;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;:::o;:::-;;;;;;;;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;:::o;:::-;-1:-1:-1;;;;;136:10391:17;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;136:10391:17;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;:::o;:::-;;;-1:-1:-1;136:10391:17;;;;;-1:-1:-1;136:10391:17;;-1:-1:-1;136:10391:17;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;:::i;:::-;;;;;;;;-1:-1:-1;136:10391:17;;-1:-1:-1;136:10391:17;-1:-1:-1;136:10391:17;;;;;;;;;;;:::o;:::-;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;-1:-1:-1;136:10391:17;;;;;;;;-1:-1:-1;;136:10391:17;;;;:::o;:::-;;;;;;;;;;;;;;;;:::i;:::-;;:::o;9858:157::-;136:10391;9924:11;136:10391;9924:11;136:10391;;;9924:26;136:10391;9924:11;136:10391;9924:26;136:10391;;9923:27;9919:90;;9858:157;:::o;9919:90::-;9973:25;;;9924:11;9973:25;;136:10391;;9924:11;9973:25;136:10391;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;;;-1:-1:-1;;136:10391:17;;;;;:::i;:::-;;;;;;;;;;-1:-1:-1;136:10391:17;;-1:-1:-1;136:10391:17;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;-1:-1:-1;;;;;136:10391:17;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;-1:-1:-1;136:10391:17;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;136:10391:17;;-1:-1:-1;136:10391:17;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;136:10391:17;;;;;;;;;;;-1:-1:-1;136:10391:17;;;;;;;;;-1:-1:-1;;;136:10391:17;", linkReferences: {}, immutableReferences: { "37646": [{ start: 2264, length: 32 }], "37648": [{ start: 178, length: 32 }] } },
+  methodIdentifiers: { "EXPECTED_AUTHOR()": "5780bd93", "EXPECTED_WORKFLOW_NAME()": "d71d79fe", "deactivateCovenant(bytes32,string)": "8aa1fef7", "getCovenant(bytes32,string)": "8ef5c48d", "getCovenantNames(bytes32)": "51d274de", "getLoanSchema(bytes32)": "0137f493", "getRegisteredLoanCount()": "8bb7e473", "isLoanRegistered(bytes32)": "bc09792f", "onReport(bytes,bytes)": "805f2132", "registeredLoans(uint256)": "89f75e8a", "supportsInterface(bytes4)": "01ffc9a7", "updateCovenantThreshold(bytes32,string,uint256)": "c3d8b340" },
+  rawMetadata: '{"compiler":{"version":"0.8.33+commit.64118f21"},"language":"Solidity","output":{"abi":[{"inputs":[{"internalType":"address","name":"_expectedAuthor","type":"address"},{"internalType":"bytes10","name":"_expectedWorkflowName","type":"bytes10"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"string","name":"covenantName","type":"string"}],"name":"ConvenantNotFound","type":"error"},{"inputs":[{"internalType":"address","name":"received","type":"address"},{"internalType":"address","name":"expected","type":"address"}],"name":"InvalidAuthor","type":"error"},{"inputs":[],"name":"InvalidCovenantArray","type":"error"},{"inputs":[],"name":"InvalidTokenAddress","type":"error"},{"inputs":[{"internalType":"bytes10","name":"received","type":"bytes10"},{"internalType":"bytes10","name":"expected","type":"bytes10"}],"name":"InvalidWorkflowName","type":"error"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"LoanAlreadyRegistered","type":"error"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"LoanNotRegistered","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"string","name":"covenantName","type":"string"},{"indexed":false,"internalType":"uint256","name":"threshold","type":"uint256"},{"indexed":false,"internalType":"string","name":"thresholdType","type":"string"}],"name":"CovenantAdded","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"string","name":"covenantName","type":"string"}],"name":"CovenantDeactivated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"string","name":"covenantName","type":"string"},{"indexed":false,"internalType":"uint256","name":"newThreshold","type":"uint256"}],"name":"CovenantUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":true,"internalType":"address","name":"tokenAddress","type":"address"},{"indexed":false,"internalType":"uint256","name":"principalAmount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"covenantCount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"}],"name":"LoanRegistered","type":"event"},{"inputs":[],"name":"EXPECTED_AUTHOR","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"EXPECTED_WORKFLOW_NAME","outputs":[{"internalType":"bytes10","name":"","type":"bytes10"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"string","name":"covenantName","type":"string"}],"name":"deactivateCovenant","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"string","name":"covenantName","type":"string"}],"name":"getCovenant","outputs":[{"internalType":"string","name":"name","type":"string"},{"internalType":"string","name":"metricDefinition","type":"string"},{"internalType":"uint256","name":"threshold","type":"uint256"},{"internalType":"string","name":"thresholdType","type":"string"},{"internalType":"string","name":"ebitdaAdjustments","type":"string"},{"internalType":"bool","name":"isActive","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"getCovenantNames","outputs":[{"internalType":"string[]","name":"","type":"string[]"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"getLoanSchema","outputs":[{"internalType":"address","name":"tokenAddress","type":"address"},{"internalType":"uint256","name":"principalAmount","type":"uint256"},{"internalType":"uint256","name":"onboardingTimestamp","type":"uint256"},{"internalType":"uint256","name":"reportingFrequency","type":"uint256"},{"internalType":"string[]","name":"covenantNames","type":"string[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getRegisteredLoanCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"isLoanRegistered","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes","name":"metadata","type":"bytes"},{"internalType":"bytes","name":"report","type":"bytes"}],"name":"onReport","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"registeredLoans","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes4","name":"interfaceId","type":"bytes4"}],"name":"supportsInterface","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"pure","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"string","name":"covenantName","type":"string"},{"internalType":"uint256","name":"newThreshold","type":"uint256"}],"name":"updateCovenantThreshold","outputs":[],"stateMutability":"nonpayable","type":"function"}],"devdoc":{"kind":"dev","methods":{"onReport(bytes,bytes)":{"params":{"metadata":"Encoded metadata (not used in testing version)","report":"Encoded report containing loan and covenant details"}},"supportsInterface(bytes4)":{"details":"Overrides PolicyProtected\'s supportsInterface to include CRE receiver interface.","params":{"interfaceId":"The interface identifier to check."},"returns":{"_0":"True if the interface is supported."}}},"version":1},"userdoc":{"kind":"user","methods":{"deactivateCovenant(bytes32,string)":{"notice":"Deactivate a covenant (stop monitoring)"},"getCovenant(bytes32,string)":{"notice":"Get specific covenant details"},"getCovenantNames(bytes32)":{"notice":"Get all covenant names for a loan"},"getLoanSchema(bytes32)":{"notice":"Get complete loan schema"},"getRegisteredLoanCount()":{"notice":"Get total number of registered loans"},"isLoanRegistered(bytes32)":{"notice":"Check if a loan is registered"},"onReport(bytes,bytes)":{"notice":"Receive report from Forwarder"},"supportsInterface(bytes4)":{"notice":"ERC165 interface support."},"updateCovenantThreshold(bytes32,string,uint256)":{"notice":"Update a covenant threshold"}},"version":1}},"settings":{"compilationTarget":{"src/LoanRegistry.sol":"LoanRegistry"},"evmVersion":"prague","libraries":{},"metadata":{"bytecodeHash":"ipfs"},"optimizer":{"enabled":true,"runs":200},"remappings":[":@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/",":forge-std/=lib/forge-std/src/",":halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/",":openzeppelin-contracts/=lib/openzeppelin-contracts/"],"viaIR":true},"sources":{"src/LoanRegistry.sol":{"keccak256":"0x52c7aeeb378f03e2812fb5130351ac96eaa8e814c0e6b6865f1e17e1e2386f01","license":"UNLICENSED","urls":["bzz-raw://0eb0e92293ad993fe34f2b6eb60dca7e7ce4da2eca6734bf0c2cb8e17af46ca6","dweb:/ipfs/QmZuGHXfSemAhueWYPzBiE1fYAHxGQRtsS6B2ezSrsyjjg"]},"src/interfaces/IReceiverTemplate.sol":{"keccak256":"0xa16d67521a3cc2cf4cfcb52e78fedaee2e2179fb8ab92f2110f2ba6f424e547b","license":"MIT","urls":["bzz-raw://f5f4480643f1bc11196404d1960b6d4b6531e087d3631a7361352e2f7a55f661","dweb:/ipfs/QmdvCPcMhrCq4drsP3dt1rVa7FvH2KS2KS1Za7g8LKWgZE"]}},"version":1}',
+  metadata: { compiler: { version: "0.8.33+commit.64118f21" }, language: "Solidity", output: { abi: [{ inputs: [{ internalType: "address", name: "_expectedAuthor", type: "address" }, { internalType: "bytes10", name: "_expectedWorkflowName", type: "bytes10" }], stateMutability: "nonpayable", type: "constructor" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "string", name: "covenantName", type: "string" }], type: "error", name: "ConvenantNotFound" }, { inputs: [{ internalType: "address", name: "received", type: "address" }, { internalType: "address", name: "expected", type: "address" }], type: "error", name: "InvalidAuthor" }, { inputs: [], type: "error", name: "InvalidCovenantArray" }, { inputs: [], type: "error", name: "InvalidTokenAddress" }, { inputs: [{ internalType: "bytes10", name: "received", type: "bytes10" }, { internalType: "bytes10", name: "expected", type: "bytes10" }], type: "error", name: "InvalidWorkflowName" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], type: "error", name: "LoanAlreadyRegistered" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], type: "error", name: "LoanNotRegistered" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "string", name: "covenantName", type: "string", indexed: false }, { internalType: "uint256", name: "threshold", type: "uint256", indexed: false }, { internalType: "string", name: "thresholdType", type: "string", indexed: false }], type: "event", name: "CovenantAdded", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "string", name: "covenantName", type: "string", indexed: false }], type: "event", name: "CovenantDeactivated", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "string", name: "covenantName", type: "string", indexed: false }, { internalType: "uint256", name: "newThreshold", type: "uint256", indexed: false }], type: "event", name: "CovenantUpdated", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "address", name: "tokenAddress", type: "address", indexed: true }, { internalType: "uint256", name: "principalAmount", type: "uint256", indexed: false }, { internalType: "uint256", name: "covenantCount", type: "uint256", indexed: false }, { internalType: "uint256", name: "timestamp", type: "uint256", indexed: false }], type: "event", name: "LoanRegistered", anonymous: false }, { inputs: [], stateMutability: "view", type: "function", name: "EXPECTED_AUTHOR", outputs: [{ internalType: "address", name: "", type: "address" }] }, { inputs: [], stateMutability: "view", type: "function", name: "EXPECTED_WORKFLOW_NAME", outputs: [{ internalType: "bytes10", name: "", type: "bytes10" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "string", name: "covenantName", type: "string" }], stateMutability: "nonpayable", type: "function", name: "deactivateCovenant" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "string", name: "covenantName", type: "string" }], stateMutability: "view", type: "function", name: "getCovenant", outputs: [{ internalType: "string", name: "name", type: "string" }, { internalType: "string", name: "metricDefinition", type: "string" }, { internalType: "uint256", name: "threshold", type: "uint256" }, { internalType: "string", name: "thresholdType", type: "string" }, { internalType: "string", name: "ebitdaAdjustments", type: "string" }, { internalType: "bool", name: "isActive", type: "bool" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "view", type: "function", name: "getCovenantNames", outputs: [{ internalType: "string[]", name: "", type: "string[]" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "view", type: "function", name: "getLoanSchema", outputs: [{ internalType: "address", name: "tokenAddress", type: "address" }, { internalType: "uint256", name: "principalAmount", type: "uint256" }, { internalType: "uint256", name: "onboardingTimestamp", type: "uint256" }, { internalType: "uint256", name: "reportingFrequency", type: "uint256" }, { internalType: "string[]", name: "covenantNames", type: "string[]" }] }, { inputs: [], stateMutability: "view", type: "function", name: "getRegisteredLoanCount", outputs: [{ internalType: "uint256", name: "", type: "uint256" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "view", type: "function", name: "isLoanRegistered", outputs: [{ internalType: "bool", name: "", type: "bool" }] }, { inputs: [{ internalType: "bytes", name: "metadata", type: "bytes" }, { internalType: "bytes", name: "report", type: "bytes" }], stateMutability: "nonpayable", type: "function", name: "onReport" }, { inputs: [{ internalType: "uint256", name: "", type: "uint256" }], stateMutability: "view", type: "function", name: "registeredLoans", outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }] }, { inputs: [{ internalType: "bytes4", name: "interfaceId", type: "bytes4" }], stateMutability: "pure", type: "function", name: "supportsInterface", outputs: [{ internalType: "bool", name: "", type: "bool" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "string", name: "covenantName", type: "string" }, { internalType: "uint256", name: "newThreshold", type: "uint256" }], stateMutability: "nonpayable", type: "function", name: "updateCovenantThreshold" }], devdoc: { kind: "dev", methods: { "onReport(bytes,bytes)": { params: { metadata: "Encoded metadata (not used in testing version)", report: "Encoded report containing loan and covenant details" } }, "supportsInterface(bytes4)": { details: "Overrides PolicyProtected's supportsInterface to include CRE receiver interface.", params: { interfaceId: "The interface identifier to check." }, returns: { _0: "True if the interface is supported." } } }, version: 1 }, userdoc: { kind: "user", methods: { "deactivateCovenant(bytes32,string)": { notice: "Deactivate a covenant (stop monitoring)" }, "getCovenant(bytes32,string)": { notice: "Get specific covenant details" }, "getCovenantNames(bytes32)": { notice: "Get all covenant names for a loan" }, "getLoanSchema(bytes32)": { notice: "Get complete loan schema" }, "getRegisteredLoanCount()": { notice: "Get total number of registered loans" }, "isLoanRegistered(bytes32)": { notice: "Check if a loan is registered" }, "onReport(bytes,bytes)": { notice: "Receive report from Forwarder" }, "supportsInterface(bytes4)": { notice: "ERC165 interface support." }, "updateCovenantThreshold(bytes32,string,uint256)": { notice: "Update a covenant threshold" } }, version: 1 } }, settings: { remappings: ["@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/", "erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/", "forge-std/=lib/forge-std/src/", "halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/", "openzeppelin-contracts/=lib/openzeppelin-contracts/"], optimizer: { enabled: true, runs: 200 }, metadata: { bytecodeHash: "ipfs" }, compilationTarget: { "src/LoanRegistry.sol": "LoanRegistry" }, evmVersion: "prague", libraries: {}, viaIR: true }, sources: { "src/LoanRegistry.sol": { keccak256: "0x52c7aeeb378f03e2812fb5130351ac96eaa8e814c0e6b6865f1e17e1e2386f01", urls: ["bzz-raw://0eb0e92293ad993fe34f2b6eb60dca7e7ce4da2eca6734bf0c2cb8e17af46ca6", "dweb:/ipfs/QmZuGHXfSemAhueWYPzBiE1fYAHxGQRtsS6B2ezSrsyjjg"], license: "UNLICENSED" }, "src/interfaces/IReceiverTemplate.sol": { keccak256: "0xa16d67521a3cc2cf4cfcb52e78fedaee2e2179fb8ab92f2110f2ba6f424e547b", urls: ["bzz-raw://f5f4480643f1bc11196404d1960b6d4b6531e087d3631a7361352e2f7a55f661", "dweb:/ipfs/QmdvCPcMhrCq4drsP3dt1rVa7FvH2KS2KS1Za7g8LKWgZE"], license: "MIT" } }, version: 1 },
+  id: 17
 };
 var LoanRegistryAbi = LoanRegistry_default.abi;
+var LoanHealthFeed_default = {
+  abi: [{ type: "constructor", inputs: [{ name: "_expectedAuthor", type: "address", internalType: "address" }, { name: "_expectedWorkflowName", type: "bytes10", internalType: "bytes10" }], stateMutability: "nonpayable" }, { type: "function", name: "EXPECTED_AUTHOR", inputs: [], outputs: [{ name: "", type: "address", internalType: "address" }], stateMutability: "view" }, { type: "function", name: "EXPECTED_WORKFLOW_NAME", inputs: [], outputs: [{ name: "", type: "bytes10", internalType: "bytes10" }], stateMutability: "view" }, { type: "function", name: "activeBreaches", inputs: [{ name: "", type: "uint256", internalType: "uint256" }], outputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], stateMutability: "view" }, { type: "function", name: "breachCount", inputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "uint256", internalType: "uint256" }], stateMutability: "view" }, { type: "function", name: "deactivateLoan", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [], stateMutability: "nonpayable" }, { type: "function", name: "getActiveBreaches", inputs: [], outputs: [{ name: "", type: "bytes32[]", internalType: "bytes32[]" }], stateMutability: "view" }, { type: "function", name: "getCovenantStatus", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "covenantName", type: "string", internalType: "string" }], outputs: [{ name: "status", type: "uint8", internalType: "enum LoanHealthFeed.CovenantStatus" }, { name: "calculatedValue", type: "uint256", internalType: "uint256" }, { name: "threshold", type: "uint256", internalType: "uint256" }, { name: "confidenceScore", type: "uint256", internalType: "uint256" }, { name: "trend", type: "uint8", internalType: "enum LoanHealthFeed.TrendIndicator" }], stateMutability: "view" }, { type: "function", name: "getHistoricalReport", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "reportIndex", type: "uint256", internalType: "uint256" }], outputs: [{ name: "overallStatus", type: "uint8", internalType: "enum LoanHealthFeed.CovenantStatus" }, { name: "overallTrend", type: "uint8", internalType: "enum LoanHealthFeed.TrendIndicator" }, { name: "overallConfidenceScore", type: "uint256", internalType: "uint256" }, { name: "reportTimestamp", type: "uint256", internalType: "uint256" }, { name: "riskNarrative", type: "string", internalType: "string" }], stateMutability: "view" }, { type: "function", name: "getLatestCovenantReports", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "tuple[]", internalType: "struct LoanHealthFeed.CovenantReport[]", components: [{ name: "covenantName", type: "string", internalType: "string" }, { name: "status", type: "uint8", internalType: "enum LoanHealthFeed.CovenantStatus" }, { name: "calculatedValue", type: "uint256", internalType: "uint256" }, { name: "threshold", type: "uint256", internalType: "uint256" }, { name: "confidenceScore", type: "uint256", internalType: "uint256" }, { name: "trend", type: "uint8", internalType: "enum LoanHealthFeed.TrendIndicator" }, { name: "notes", type: "string", internalType: "string" }] }], stateMutability: "view" }, { type: "function", name: "getLatestReport", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "overallStatus", type: "uint8", internalType: "enum LoanHealthFeed.CovenantStatus" }, { name: "overallTrend", type: "uint8", internalType: "enum LoanHealthFeed.TrendIndicator" }, { name: "overallConfidenceScore", type: "uint256", internalType: "uint256" }, { name: "reportTimestamp", type: "uint256", internalType: "uint256" }, { name: "reportIndex", type: "uint256", internalType: "uint256" }, { name: "riskNarrative", type: "string", internalType: "string" }, { name: "isActive", type: "bool", internalType: "bool" }], stateMutability: "view" }, { type: "function", name: "getLoanSummary", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "tuple", internalType: "struct LoanHealthFeed.LoanHealthSummary", components: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "overallStatus", type: "uint8", internalType: "enum LoanHealthFeed.CovenantStatus" }, { name: "overallTrend", type: "uint8", internalType: "enum LoanHealthFeed.TrendIndicator" }, { name: "overallConfidenceScore", type: "uint256", internalType: "uint256" }, { name: "lastUpdated", type: "uint256", internalType: "uint256" }, { name: "totalReports", type: "uint256", internalType: "uint256" }, { name: "totalBreaches", type: "uint256", internalType: "uint256" }, { name: "totalWarnings", type: "uint256", internalType: "uint256" }] }], stateMutability: "view" }, { type: "function", name: "getMonitoredLoanCount", inputs: [], outputs: [{ name: "", type: "uint256", internalType: "uint256" }], stateMutability: "view" }, { type: "function", name: "getRecentStatusHistory", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "n", type: "uint256", internalType: "uint256" }], outputs: [{ name: "statuses", type: "uint8[]", internalType: "enum LoanHealthFeed.CovenantStatus[]" }, { name: "timestamps", type: "uint256[]", internalType: "uint256[]" }], stateMutability: "view" }, { type: "function", name: "isInBreach", inputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "bool", internalType: "bool" }], stateMutability: "view" }, { type: "function", name: "isLoanInBreach", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "bool", internalType: "bool" }], stateMutability: "view" }, { type: "function", name: "isLoanMonitored", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "bool", internalType: "bool" }], stateMutability: "view" }, { type: "function", name: "monitoredLoans", inputs: [{ name: "", type: "uint256", internalType: "uint256" }], outputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], stateMutability: "view" }, { type: "function", name: "onReport", inputs: [{ name: "metadata", type: "bytes", internalType: "bytes" }, { name: "report", type: "bytes", internalType: "bytes" }], outputs: [], stateMutability: "nonpayable" }, { type: "function", name: "reportCount", inputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "uint256", internalType: "uint256" }], stateMutability: "view" }, { type: "function", name: "supportsInterface", inputs: [{ name: "interfaceId", type: "bytes4", internalType: "bytes4" }], outputs: [{ name: "", type: "bool", internalType: "bool" }], stateMutability: "pure" }, { type: "function", name: "warningCount", inputs: [{ name: "", type: "bytes32", internalType: "bytes32" }], outputs: [{ name: "", type: "uint256", internalType: "uint256" }], stateMutability: "view" }, { type: "event", name: "BreachResolved", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "timestamp", type: "uint256", indexed: false, internalType: "uint256" }], anonymous: false }, { type: "event", name: "CovenantBreach", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "covenantName", type: "string", indexed: false, internalType: "string" }, { name: "calculatedValue", type: "uint256", indexed: false, internalType: "uint256" }, { name: "threshold", type: "uint256", indexed: false, internalType: "uint256" }, { name: "confidenceScore", type: "uint256", indexed: false, internalType: "uint256" }, { name: "timestamp", type: "uint256", indexed: false, internalType: "uint256" }], anonymous: false }, { type: "event", name: "CovenantWarning", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "covenantName", type: "string", indexed: false, internalType: "string" }, { name: "calculatedValue", type: "uint256", indexed: false, internalType: "uint256" }, { name: "threshold", type: "uint256", indexed: false, internalType: "uint256" }, { name: "timestamp", type: "uint256", indexed: false, internalType: "uint256" }], anonymous: false }, { type: "event", name: "LoanHealthReportPublished", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "reportIndex", type: "uint256", indexed: false, internalType: "uint256" }, { name: "overallStatus", type: "uint8", indexed: false, internalType: "enum LoanHealthFeed.CovenantStatus" }, { name: "overallTrend", type: "uint8", indexed: false, internalType: "enum LoanHealthFeed.TrendIndicator" }, { name: "overallConfidenceScore", type: "uint256", indexed: false, internalType: "uint256" }, { name: "timestamp", type: "uint256", indexed: false, internalType: "uint256" }], anonymous: false }, { type: "event", name: "LoanMonitoringActivated", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "timestamp", type: "uint256", indexed: false, internalType: "uint256" }], anonymous: false }, { type: "event", name: "LoanMonitoringDeactivated", inputs: [{ name: "loanId", type: "bytes32", indexed: true, internalType: "bytes32" }, { name: "timestamp", type: "uint256", indexed: false, internalType: "uint256" }], anonymous: false }, { type: "error", name: "ArrayLengthMismatch", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }] }, { type: "error", name: "AtleastOneCovenantRequired", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }] }, { type: "error", name: "InvalidAuthor", inputs: [{ name: "received", type: "address", internalType: "address" }, { name: "expected", type: "address", internalType: "address" }] }, { type: "error", name: "InvalidConfidenceScore", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }, { name: "score", type: "uint256", internalType: "uint256" }] }, { type: "error", name: "InvalidWorkflowName", inputs: [{ name: "received", type: "bytes10", internalType: "bytes10" }, { name: "expected", type: "bytes10", internalType: "bytes10" }] }, { type: "error", name: "LoanNotMonitored", inputs: [{ name: "loanId", type: "bytes32", internalType: "bytes32" }] }],
+  bytecode: { object: "0x60c034608857601f61215838819003918201601f19168301916001600160401b03831184841017608c5780849260409485528339810103126088578051906001600160a01b038216820360885760200151906001600160b01b03198216820360885760805260a0526040516120b790816100a1823960805181611615015260a051816103650152f35b5f80fd5b634e487b7160e01b5f52604160045260245ffdfe6080806040526004361015610012575f80fd5b5f3560e01c90816301ffc9a7146118b957508063203830b11461188b578063233eaca81461185357806329b5e21b1461179d5780633dd591371461176e57806347bac1fc1461176e5780634def3188146116b257806351a34f79146116445780635780bd931461160057806357eebf31146114bf578063629868511461144557806363604d8914611428578063805f2132146106be578063835369c314610694578063bd8f63ea146104d0578063cf1a2058146104a6578063d4e24d3814610395578063d71d79fe14610350578063d750b20214610326578063e21fcc9c146101675763fbf4697514610103575f80fd5b346101635760203660031901126101635760043561012081611c6a565b805f526001602052600860405f200160ff1981541690557f8b6656e2b6ad941d2ad4bcff13a5868a31e9700c209e828b40849e7c0393a0df6020604051428152a2005b5f80fd5b346101635761017536611999565b61017e82611c6a565b815f52600360205260405f2054908181115f1461030d575090815b6101a283611c3f565b916101b060405193846119e6565b8383526101bc84611c3f565b602084019190601f19013683376101d285611c3f565b946101e060405196876119e6565b8086526101ec81611c3f565b602087019490601f19013686375f5b82811061028f5750505050604051938493604085019060408652518091526060850192905f5b818110610266575050506020908483038286015251918281520191905f5b81811061024d575050500390f35b825184528594506020938401939092019160010161023f565b919495509192602080600192875161027d8161192a565b81520195019101918695949392610221565b5f979495969750828203908282116102f9578082018092116102f957600191855f52600260205260405f20905f526020528160405f2060ff6003820154166102d7848d611c56565b6102e08261192a565b5201546102ed8288611c56565b520196959493966101fb565b634e487b7160e01b5f52601160045260245ffd5b6014811115610321575060145b9190610199565b61031a565b34610163576020366003190112610163576004355f526003602052602060405f2054604051908152f35b34610163575f366003190112610163576040517f00000000000000000000000000000000000000000000000000000000000000006001600160b01b0319168152602090f35b34610163576103a336611999565b906103ad81611c6a565b805f52600360205260405f205482101561044f575f52600260205260405f20905f5260205260405f2060ff60038201541661044b600760ff60058501541693600681015461041160018301549261040a6040518096819301611a3f565b03846119e6565b6040519585610420889761192a565b865261042b8161192a565b60208601526040850152606084015260a0608084015260a0830190611948565b0390f35b60405162461bcd60e51b815260206004820152602960248201527f4c6f616e4865616c7468466565643a205265706f727420696e646578206f7574604482015268206f662072616e676560b81b6064820152608490fd5b34610163576020366003190112610163576004355f526004602052602060405f2054604051908152f35b34610163576020366003190112610163576004356104ed81611c6a565b5f526001602052600460405f200180549061050782611c3f565b9161051560405193846119e6565b8083526020830180925f5260205f205f915b8383106105f857848660405191829160208301906020845251809152604083019060408160051b85010192915f905b82821061056557505050500390f35b919360019193955060206105e88192603f198a820301865288519060c0610595835160e0845260e0840190611948565b92858101516105a38161192a565b8684015260408101516040840152606081015160608401526080810151608084015260a08101516105d38161192a565b60a084015201519060c0818403910152611948565b9601920192018594939192610556565b6007602060019260405161060b816119cb565b6040516106238161061c818a611a3f565b03826119e6565b815260ff85870154166106358161192a565b8382015260028601546040820152600386015460608201526004860154608082015260ff6005870154166106688161192a565b60a08201526040516106818161061c8160068b01611a3f565b60c0820152815201920192019190610527565b34610163576020366003190112610163576004355f526006602052602060405f2054604051908152f35b34610163576040366003190112610163576004356001600160401b038111610163576106ee90369060040161196c565b50506024356001600160401b0381116101635761070f90369060040161196c565b810190602081830312610163578035906001600160401b03821161016357019061018082820312610163576040519161018083018381106001600160401b03821117610e64576040528035835260208101356003811015610163576020840152604081013560038110156101635760408401526060810135606084015260808101356001600160401b03811161016357826107ab918301611c93565b916080840192835260a08201356001600160401b03811161016357816107d2918401611cb1565b60a085015260c08201356001600160401b03811161016357820181601f8201121561016357803561080281611c3f565b9161081060405193846119e6565b81835260208084019260051b8201019084821161016357602001915b81831061140f5750505060c085015260e08201356001600160401b038111610163578161085a918401611d2f565b60e08501526101008201356001600160401b038111610163578161087f918401611d2f565b6101008501526101208201356001600160401b03811161016357816108a5918401611d2f565b6101208501526101408201356001600160401b03811161016357820181601f820112156101635780356108d781611c3f565b916108e560405193846119e6565b81835260208084019260051b8201019084821161016357602001915b8183106113f6575050506101408501526101608201356001600160401b0381116101635761092f9201611cb1565b61016083015260a082015151156113e25760a08201515160c0830151518114908115916113d2575b81156113c1575b81156113b0575b811561139f575b811561138e575b5061137a57606082015160648111611363575081515f52600360205260405f205482515f52600260205260405f20815f5260205260405f2091835183554260018401558160028401556109d660208501516109cd8161192a565b60038501611d8c565b6109f060408501516109e78161192a565b60058501611d8c565b60608401516006840155519283516001600160401b038111610e6457610a2681610a1d6007870154611a07565b60078701611dbf565b6020601f82116001146112f7578190610a57939495965f926112ec575b50508160011b915f199060031b1c19161790565b600784015591905b60088201805460ff191660011790555f925b60a08101518051851015610ef35784610a8991611c56565b5193610a998160c0840151611c56565b51610aa38161192a565b610ab18260e0850151611c56565b51610ac183610100860151611c56565b51610ad184610120870151611c56565b5190610ae285610140880151611c56565b5192610aed8461192a565b610afc86610160890151611c56565b51946040519a610b0b8c6119cb565b8b52610b168161192a565b60208b015260408a015260608901526080880152610b338161192a565b60a087015260c08601526004840154600160401b811015610e6457806001610b649201600487015560048601611ac0565b959095610ee05780518051906001600160401b038211610e6457610b9282610b8c8a54611a07565b8a611dbf565b602090601f8311600114610e78579180610bc49260c095945f92610deb5750508160011b915f199060031b1c19161790565b87555b610be16020820151610bd88161192a565b60018901611d8c565b604081015160028801556060810151600388015560808101516004880155610c1960a0820151610c108161192a565b60058901611d8c565b01519485516001600160401b038111610e6457610c4681610c3d6006850154611a07565b60068501611dbf565b6020601f8211600114610df65781600692610c7b9260019798999a5f92610deb5750508160011b915f199060031b1c19161790565b9101555b6002610c8f8260c0860151611c56565b51610c998161192a565b610ca28161192a565b03610d435782517fa49c7c39ef0643ef5e3e4fdab44315da56fbb74ed8fced74a722d6884704e5d0610d20610cdb8460a0880151611c56565b51610cea8560e0890151611c56565b51610cfa866101008a0151611c56565b51610d0a876101208b0151611c56565b519060405194859460a0865260a0860190611948565b926020850152604084015260608301524260808301520390a25b01929190610a71565b81610d528260c0860151611c56565b51610d5c8161192a565b610d658161192a565b03610d3a5782517faf50394f2a8744ad52dfb5a388efda1ba27ef8b3c22968a66de518b1da18efa6610dd2610d9e8460a0880151611c56565b51610dad8560e0890151611c56565b51610dbd866101008a0151611c56565b51604051938493608085526080850190611948565b91602084015260408301524260608301520390a2610d3a565b015190508a80610a43565b600683015f52805f20975f5b601f1984168110610e4c575091600195969798869260069483601f19811610610e34575b505050811b01910155610c7f565b01515f1960f88460031b161c19169055898080610e26565b828201518a5560019099019860209283019201610e02565b634e487b7160e01b5f52604160045260245ffd5b90885f52805f20915f5b601f1985168110610ec8575091839160019360c09695601f19811610610eb0575b505050811b018755610bc7565b01515f1960f88460031b161c19169055898080610ea3565b91926020600181928685015181550194019201610e82565b634e487b7160e01b5f525f60045260245ffd5b509182515f52600160205260405f20818103611264575b505081515f52600360205260405f20610f238154612073565b905560026020830151610f358161192a565b610f3e8161192a565b036112285781515f52600460205260405f20610f5a8154612073565b90555b81516020830151610f6d8161192a565b815f52600860205260ff60405f20541690610f878161192a565b60028114908180611220575b1561111857505050805f52600860205260405f20600160ff19825416179055600754600160401b811015610e6457610fd6816001610fec93016007556007611915565b819391549060031b91821b915f19901b19161790565b90555b81515f525f60205260ff60405f2054161561107f575b60a07f162277fae25a18f61c580823c5d0a4de9d6b7dfd3f9df5b61f543655c3b7ff5f9183519360208101519061103b8261192a565b606060408201519161104c8361192a565b01519160405193845261105e8161192a565b602084015261106c8161192a565b60408301526060820152426080820152a2005b81515f525f60205260405f20600160ff1982541617905581519060055490600160401b821015610e64577f162277fae25a18f61c580823c5d0a4de9d6b7dfd3f9df5b61f543655c3b7ff5f926110e2610fd684600160a096016005556005611915565b905583517f861ef34e34cf945c5e1118b1f77579f16707785a47d4d547c4596a34dbfa8d706020604051428152a2915050611005565b6111219061192a565b159081611218575b50611135575b50610fef565b90815f52600860205260405f2060ff198154169055600754915f5b83811061118c575b509091507fcf8bf87096ae3e08f7fa43e7cb33c87aba249d49ec23d20b3b5c5748acde4d556020604051428152a28261112f565b81611196826118fd565b90549060031b1c146111aa57600101611150565b9091925f1981019081116102f957610fd66111c76111d4926118fd565b90549060031b1c926118fd565b90556007548015611204575f19016111eb816118fd565b8154905f199060031b1b19169055600755819084611158565b634e487b7160e01b5f52603160045260245ffd5b905084611129565b508215610f93565b600160208301516112388161192a565b6112418161192a565b03610f5d5781515f52600660205260405f2061125d8154612073565b9055610f5d565b60088060ff928454815560018501546001820155600285015460028201556112958460038701541660038301611d8c565b6112a56004860160048301611f3c565b6112b88460058701541660058301611d8c565b600685015460068201556112d26007860160078301611e5d565b0192015416151560ff801983541691161790558280610f0a565b015190508680610a43565b600785015f52805f20905f5b601f198416811061134b575060019394959683601f19811610611333575b505050811b0160078401559190610a5f565b01515f1960f88460031b161c19169055858080611321565b9091602060018192858b015181550193019101611303565b8251633347396160e21b5f5260045260245260445ffd5b5051634c35e9b360e11b5f5260045260245ffd5b905061016083015151141583610973565b61014084015151811415915061096c565b610120840151518114159150610965565b61010084015151811415915061095e565b60e0840151518114159150610957565b5051630b1a688d60e11b5f5260045260245ffd5b8235600381101561016357815260209283019201610901565b823560038110156101635781526020928301920161082c565b34610163575f366003190112610163576020600554604051908152f35b34610163576040366003190112610163576004356024356001600160401b0381116101635760a09161147e61148d92369060040161196c565b9161148881611c6a565b611b1e565b926040929192519461149e8161192a565b85526020850152604084015260608301526114b88161192a565b6080820152f35b34610163576020366003190112610163576101006004355f60e06040516114e5816119af565b8281528260208201528260408201528260608201528260808201528260a08201528260c0820152015261151781611c6a565b805f52600160205260405f2060ff6003820154169060ff6005820154169060016006820154910154845f52600360205260405f205491855f52600460205260405f205493865f52600660205260405f20549560405197611576896119af565b885260208801906115868161192a565b815260408801916115968161192a565b8252606088019283526080880193845260a0880194855260c0880195865260e0880196875260405197518852516115cc8161192a565b6020880152516115db8161192a565b60408701525160608601525160808501525160a08401525160c08301525160e0820152f35b34610163575f366003190112610163576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b34610163576020366003190112610163576004356005548110156101635760055481101561169e5760055f527f036b6384b5eca791c62761152d0c79bb0604c104a5fb6f4eb0703f3154bb3db00154604051908152602090f35b634e487b7160e01b5f52603260045260245ffd5b34610163576020366003190112610163576004356116cf81611c6a565b5f52600160205260405f2060ff60038201541660ff6005830154169161176260076006830154600184015460028501549161172360ff6008880154169661171c6040518097819301611a3f565b03856119e6565b60405197876117328a9961192a565b885261173d8161192a565b602088015260408701526060860152608085015260e060a085015260e0840190611948565b90151560c08301520390f35b34610163576020366003190112610163576004355f526008602052602060ff60405f2054166040519015158152f35b34610163575f366003190112610163576040518060206007549283815201809260075f527fa66cc928b5edb82af9bd49922954155ab7b0942694bea4ce44661d9a8736c688905f5b81811061183d57505050816117fb9103826119e6565b604051918291602083019060208452518091526040830191905f5b818110611824575050500390f35b8251845285945060209384019390920191600101611816565b82548452602090930192600192830192016117e5565b34610163576020366003190112610163576004356007548110156101635761187c6020916118fd565b90549060031b1c604051908152f35b34610163576020366003190112610163576004355f525f602052602060ff60405f2054166040519015158152f35b34610163576020366003190112610163576004359063ffffffff60e01b82168092036101635760209163402f909960e11b1480156118f8575b15158152f35b6118f2565b60075481101561169e5760075f5260205f2001905f90565b805482101561169e575f5260205f2001905f90565b6003111561193457565b634e487b7160e01b5f52602160045260245ffd5b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b9181601f84011215610163578235916001600160401b038311610163576020838186019501011161016357565b6040906003190112610163576004359060243590565b61010081019081106001600160401b03821117610e6457604052565b60e081019081106001600160401b03821117610e6457604052565b90601f801991011681019081106001600160401b03821117610e6457604052565b90600182811c92168015611a35575b6020831014611a2157565b634e487b7160e01b5f52602260045260245ffd5b91607f1691611a16565b5f9291815491611a4e83611a07565b8083529260018116908115611aa35750600114611a6a57505050565b5f9081526020812093945091925b838310611a89575060209250010190565b600181602092949394548385870101520191019190611a78565b915050602093945060ff929192191683830152151560051b010190565b805482101561169e575f52600760205f20910201905f90565b9291926001600160401b038211610e645760405191611b02601f8201601f1916602001846119e6565b829481845281830111610163578281602093845f960137010152565b9190915f526001602052600460405f2001905f928254935b848110611b9e5760405162461bcd60e51b815260206004820152603360248201527f4c6f616e4865616c7468466565643a20436f76656e616e74206e6f7420666f756044820152721b99081a5b881b185d195cdd081c995c1bdc9d606a1b6064820152608490fd5b61061c611bbb611bae8387611ac0565b5060405192838092611a3f565b60208151910120611bcd368585611ad9565b6020815191012014611be157600101611b36565b9350505060ff6001611bf38484611ac0565b500154166002611c038484611ac0565b5001549360ff6005611c336003611c1a8888611ac0565b500154966004611c2a8289611ac0565b50015496611ac0565b50015416919493929190565b6001600160401b038111610e645760051b60200190565b805182101561169e5760209160051b010190565b805f525f60205260ff60405f20541615611c815750565b6304472d1360e21b5f5260045260245ffd5b9080601f8301121561016357816020611cae93359101611ad9565b90565b9080601f83011215610163578135611cc881611c3f565b92611cd660405194856119e6565b81845260208085019260051b820101918383116101635760208201905b838210611d0257505050505090565b81356001600160401b03811161016357602091611d2487848094880101611c93565b815201910190611cf3565b9080601f83011215610163578135611d4681611c3f565b92611d5460405194856119e6565b81845260208085019260051b82010192831161016357602001905b828210611d7c5750505090565b8135815260209182019101611d6f565b90611d968161192a565b60ff80198354169116179055565b5f5b828110611db257505050565b5f82820155600101611da6565b91601f8211611dcd57505050565b808211611dd957505050565b611e04925f5260205f20916020601f830160051c9210611e06575b601f82910160051c039101611da4565b565b5f9150611df4565b611e188154611a07565b9081611e22575050565b81601f5f9311600114611e33575055565b81835260208320611e5091601f0160051c84190190600101611da4565b8082528160208120915555565b919091828114611f3757611e718354611a07565b6001600160401b038111610e6457611e9381611e8d8454611a07565b84611dbf565b5f93601f8211600114611ed157611ec292939482915f92611ec65750508160011b915f199060031b1c19161790565b9055565b015490505f80610a43565b601f198216905f5260205f2094835f5260205f20915f5b818110611f1f57509583600195969710611f07575b505050811b019055565b01545f1960f88460031b161c191690555f8080611efd565b9192600180602092868b015481550194019201611ee8565b509050565b81811461206f57815491600160401b8311610e64578154838355808410611ff9575b505f5260205f20905f5260205f205f915b838310611f7c5750505050565b600780826001938503611f96575b01920192019190611f6f565b611fa08186611e5d565b611fb260ff8583015416858701611d8c565b600281015460028601556003810154600386015560048101546004860155611fe460ff60058301541660058701611d8c565b611ff46006820160068701611e5d565b611f8a565b806007029060078204036102f957836007026007810485036102f957835f528060205f20019103905f5b828110612031575050611f5e565b806120696006600793850161204581611e0e565b5f60018201555f60028201555f60038201555f60048201555f600582015501611e0e565b01612023565b5050565b5f1981146102f9576001019056fea26469706673582212208e3cb4508792a517948e7f13d1cd639aa1efd4f2616913af8a74fb66c111d18364736f6c63430008210033", sourceMap: "136:15084:16:-:0;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;-1:-1:-1;;;;;;136:15084:16;;;;;;612:32:18;;654:45;;136:15084:16;;;;;;;;612:32:18;136:15084:16;;;;;654:45:18;136:15084:16;;;;;;;-1:-1:-1;136:15084:16;;;;;;-1:-1:-1;136:15084:16;;;;;-1:-1:-1;136:15084:16", linkReferences: {} },
+  deployedBytecode: { object: "0x6080806040526004361015610012575f80fd5b5f3560e01c90816301ffc9a7146118b957508063203830b11461188b578063233eaca81461185357806329b5e21b1461179d5780633dd591371461176e57806347bac1fc1461176e5780634def3188146116b257806351a34f79146116445780635780bd931461160057806357eebf31146114bf578063629868511461144557806363604d8914611428578063805f2132146106be578063835369c314610694578063bd8f63ea146104d0578063cf1a2058146104a6578063d4e24d3814610395578063d71d79fe14610350578063d750b20214610326578063e21fcc9c146101675763fbf4697514610103575f80fd5b346101635760203660031901126101635760043561012081611c6a565b805f526001602052600860405f200160ff1981541690557f8b6656e2b6ad941d2ad4bcff13a5868a31e9700c209e828b40849e7c0393a0df6020604051428152a2005b5f80fd5b346101635761017536611999565b61017e82611c6a565b815f52600360205260405f2054908181115f1461030d575090815b6101a283611c3f565b916101b060405193846119e6565b8383526101bc84611c3f565b602084019190601f19013683376101d285611c3f565b946101e060405196876119e6565b8086526101ec81611c3f565b602087019490601f19013686375f5b82811061028f5750505050604051938493604085019060408652518091526060850192905f5b818110610266575050506020908483038286015251918281520191905f5b81811061024d575050500390f35b825184528594506020938401939092019160010161023f565b919495509192602080600192875161027d8161192a565b81520195019101918695949392610221565b5f979495969750828203908282116102f9578082018092116102f957600191855f52600260205260405f20905f526020528160405f2060ff6003820154166102d7848d611c56565b6102e08261192a565b5201546102ed8288611c56565b520196959493966101fb565b634e487b7160e01b5f52601160045260245ffd5b6014811115610321575060145b9190610199565b61031a565b34610163576020366003190112610163576004355f526003602052602060405f2054604051908152f35b34610163575f366003190112610163576040517f00000000000000000000000000000000000000000000000000000000000000006001600160b01b0319168152602090f35b34610163576103a336611999565b906103ad81611c6a565b805f52600360205260405f205482101561044f575f52600260205260405f20905f5260205260405f2060ff60038201541661044b600760ff60058501541693600681015461041160018301549261040a6040518096819301611a3f565b03846119e6565b6040519585610420889761192a565b865261042b8161192a565b60208601526040850152606084015260a0608084015260a0830190611948565b0390f35b60405162461bcd60e51b815260206004820152602960248201527f4c6f616e4865616c7468466565643a205265706f727420696e646578206f7574604482015268206f662072616e676560b81b6064820152608490fd5b34610163576020366003190112610163576004355f526004602052602060405f2054604051908152f35b34610163576020366003190112610163576004356104ed81611c6a565b5f526001602052600460405f200180549061050782611c3f565b9161051560405193846119e6565b8083526020830180925f5260205f205f915b8383106105f857848660405191829160208301906020845251809152604083019060408160051b85010192915f905b82821061056557505050500390f35b919360019193955060206105e88192603f198a820301865288519060c0610595835160e0845260e0840190611948565b92858101516105a38161192a565b8684015260408101516040840152606081015160608401526080810151608084015260a08101516105d38161192a565b60a084015201519060c0818403910152611948565b9601920192018594939192610556565b6007602060019260405161060b816119cb565b6040516106238161061c818a611a3f565b03826119e6565b815260ff85870154166106358161192a565b8382015260028601546040820152600386015460608201526004860154608082015260ff6005870154166106688161192a565b60a08201526040516106818161061c8160068b01611a3f565b60c0820152815201920192019190610527565b34610163576020366003190112610163576004355f526006602052602060405f2054604051908152f35b34610163576040366003190112610163576004356001600160401b038111610163576106ee90369060040161196c565b50506024356001600160401b0381116101635761070f90369060040161196c565b810190602081830312610163578035906001600160401b03821161016357019061018082820312610163576040519161018083018381106001600160401b03821117610e64576040528035835260208101356003811015610163576020840152604081013560038110156101635760408401526060810135606084015260808101356001600160401b03811161016357826107ab918301611c93565b916080840192835260a08201356001600160401b03811161016357816107d2918401611cb1565b60a085015260c08201356001600160401b03811161016357820181601f8201121561016357803561080281611c3f565b9161081060405193846119e6565b81835260208084019260051b8201019084821161016357602001915b81831061140f5750505060c085015260e08201356001600160401b038111610163578161085a918401611d2f565b60e08501526101008201356001600160401b038111610163578161087f918401611d2f565b6101008501526101208201356001600160401b03811161016357816108a5918401611d2f565b6101208501526101408201356001600160401b03811161016357820181601f820112156101635780356108d781611c3f565b916108e560405193846119e6565b81835260208084019260051b8201019084821161016357602001915b8183106113f6575050506101408501526101608201356001600160401b0381116101635761092f9201611cb1565b61016083015260a082015151156113e25760a08201515160c0830151518114908115916113d2575b81156113c1575b81156113b0575b811561139f575b811561138e575b5061137a57606082015160648111611363575081515f52600360205260405f205482515f52600260205260405f20815f5260205260405f2091835183554260018401558160028401556109d660208501516109cd8161192a565b60038501611d8c565b6109f060408501516109e78161192a565b60058501611d8c565b60608401516006840155519283516001600160401b038111610e6457610a2681610a1d6007870154611a07565b60078701611dbf565b6020601f82116001146112f7578190610a57939495965f926112ec575b50508160011b915f199060031b1c19161790565b600784015591905b60088201805460ff191660011790555f925b60a08101518051851015610ef35784610a8991611c56565b5193610a998160c0840151611c56565b51610aa38161192a565b610ab18260e0850151611c56565b51610ac183610100860151611c56565b51610ad184610120870151611c56565b5190610ae285610140880151611c56565b5192610aed8461192a565b610afc86610160890151611c56565b51946040519a610b0b8c6119cb565b8b52610b168161192a565b60208b015260408a015260608901526080880152610b338161192a565b60a087015260c08601526004840154600160401b811015610e6457806001610b649201600487015560048601611ac0565b959095610ee05780518051906001600160401b038211610e6457610b9282610b8c8a54611a07565b8a611dbf565b602090601f8311600114610e78579180610bc49260c095945f92610deb5750508160011b915f199060031b1c19161790565b87555b610be16020820151610bd88161192a565b60018901611d8c565b604081015160028801556060810151600388015560808101516004880155610c1960a0820151610c108161192a565b60058901611d8c565b01519485516001600160401b038111610e6457610c4681610c3d6006850154611a07565b60068501611dbf565b6020601f8211600114610df65781600692610c7b9260019798999a5f92610deb5750508160011b915f199060031b1c19161790565b9101555b6002610c8f8260c0860151611c56565b51610c998161192a565b610ca28161192a565b03610d435782517fa49c7c39ef0643ef5e3e4fdab44315da56fbb74ed8fced74a722d6884704e5d0610d20610cdb8460a0880151611c56565b51610cea8560e0890151611c56565b51610cfa866101008a0151611c56565b51610d0a876101208b0151611c56565b519060405194859460a0865260a0860190611948565b926020850152604084015260608301524260808301520390a25b01929190610a71565b81610d528260c0860151611c56565b51610d5c8161192a565b610d658161192a565b03610d3a5782517faf50394f2a8744ad52dfb5a388efda1ba27ef8b3c22968a66de518b1da18efa6610dd2610d9e8460a0880151611c56565b51610dad8560e0890151611c56565b51610dbd866101008a0151611c56565b51604051938493608085526080850190611948565b91602084015260408301524260608301520390a2610d3a565b015190508a80610a43565b600683015f52805f20975f5b601f1984168110610e4c575091600195969798869260069483601f19811610610e34575b505050811b01910155610c7f565b01515f1960f88460031b161c19169055898080610e26565b828201518a5560019099019860209283019201610e02565b634e487b7160e01b5f52604160045260245ffd5b90885f52805f20915f5b601f1985168110610ec8575091839160019360c09695601f19811610610eb0575b505050811b018755610bc7565b01515f1960f88460031b161c19169055898080610ea3565b91926020600181928685015181550194019201610e82565b634e487b7160e01b5f525f60045260245ffd5b509182515f52600160205260405f20818103611264575b505081515f52600360205260405f20610f238154612073565b905560026020830151610f358161192a565b610f3e8161192a565b036112285781515f52600460205260405f20610f5a8154612073565b90555b81516020830151610f6d8161192a565b815f52600860205260ff60405f20541690610f878161192a565b60028114908180611220575b1561111857505050805f52600860205260405f20600160ff19825416179055600754600160401b811015610e6457610fd6816001610fec93016007556007611915565b819391549060031b91821b915f19901b19161790565b90555b81515f525f60205260ff60405f2054161561107f575b60a07f162277fae25a18f61c580823c5d0a4de9d6b7dfd3f9df5b61f543655c3b7ff5f9183519360208101519061103b8261192a565b606060408201519161104c8361192a565b01519160405193845261105e8161192a565b602084015261106c8161192a565b60408301526060820152426080820152a2005b81515f525f60205260405f20600160ff1982541617905581519060055490600160401b821015610e64577f162277fae25a18f61c580823c5d0a4de9d6b7dfd3f9df5b61f543655c3b7ff5f926110e2610fd684600160a096016005556005611915565b905583517f861ef34e34cf945c5e1118b1f77579f16707785a47d4d547c4596a34dbfa8d706020604051428152a2915050611005565b6111219061192a565b159081611218575b50611135575b50610fef565b90815f52600860205260405f2060ff198154169055600754915f5b83811061118c575b509091507fcf8bf87096ae3e08f7fa43e7cb33c87aba249d49ec23d20b3b5c5748acde4d556020604051428152a28261112f565b81611196826118fd565b90549060031b1c146111aa57600101611150565b9091925f1981019081116102f957610fd66111c76111d4926118fd565b90549060031b1c926118fd565b90556007548015611204575f19016111eb816118fd565b8154905f199060031b1b19169055600755819084611158565b634e487b7160e01b5f52603160045260245ffd5b905084611129565b508215610f93565b600160208301516112388161192a565b6112418161192a565b03610f5d5781515f52600660205260405f2061125d8154612073565b9055610f5d565b60088060ff928454815560018501546001820155600285015460028201556112958460038701541660038301611d8c565b6112a56004860160048301611f3c565b6112b88460058701541660058301611d8c565b600685015460068201556112d26007860160078301611e5d565b0192015416151560ff801983541691161790558280610f0a565b015190508680610a43565b600785015f52805f20905f5b601f198416811061134b575060019394959683601f19811610611333575b505050811b0160078401559190610a5f565b01515f1960f88460031b161c19169055858080611321565b9091602060018192858b015181550193019101611303565b8251633347396160e21b5f5260045260245260445ffd5b5051634c35e9b360e11b5f5260045260245ffd5b905061016083015151141583610973565b61014084015151811415915061096c565b610120840151518114159150610965565b61010084015151811415915061095e565b60e0840151518114159150610957565b5051630b1a688d60e11b5f5260045260245ffd5b8235600381101561016357815260209283019201610901565b823560038110156101635781526020928301920161082c565b34610163575f366003190112610163576020600554604051908152f35b34610163576040366003190112610163576004356024356001600160401b0381116101635760a09161147e61148d92369060040161196c565b9161148881611c6a565b611b1e565b926040929192519461149e8161192a565b85526020850152604084015260608301526114b88161192a565b6080820152f35b34610163576020366003190112610163576101006004355f60e06040516114e5816119af565b8281528260208201528260408201528260608201528260808201528260a08201528260c0820152015261151781611c6a565b805f52600160205260405f2060ff6003820154169060ff6005820154169060016006820154910154845f52600360205260405f205491855f52600460205260405f205493865f52600660205260405f20549560405197611576896119af565b885260208801906115868161192a565b815260408801916115968161192a565b8252606088019283526080880193845260a0880194855260c0880195865260e0880196875260405197518852516115cc8161192a565b6020880152516115db8161192a565b60408701525160608601525160808501525160a08401525160c08301525160e0820152f35b34610163575f366003190112610163576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b34610163576020366003190112610163576004356005548110156101635760055481101561169e5760055f527f036b6384b5eca791c62761152d0c79bb0604c104a5fb6f4eb0703f3154bb3db00154604051908152602090f35b634e487b7160e01b5f52603260045260245ffd5b34610163576020366003190112610163576004356116cf81611c6a565b5f52600160205260405f2060ff60038201541660ff6005830154169161176260076006830154600184015460028501549161172360ff6008880154169661171c6040518097819301611a3f565b03856119e6565b60405197876117328a9961192a565b885261173d8161192a565b602088015260408701526060860152608085015260e060a085015260e0840190611948565b90151560c08301520390f35b34610163576020366003190112610163576004355f526008602052602060ff60405f2054166040519015158152f35b34610163575f366003190112610163576040518060206007549283815201809260075f527fa66cc928b5edb82af9bd49922954155ab7b0942694bea4ce44661d9a8736c688905f5b81811061183d57505050816117fb9103826119e6565b604051918291602083019060208452518091526040830191905f5b818110611824575050500390f35b8251845285945060209384019390920191600101611816565b82548452602090930192600192830192016117e5565b34610163576020366003190112610163576004356007548110156101635761187c6020916118fd565b90549060031b1c604051908152f35b34610163576020366003190112610163576004355f525f602052602060ff60405f2054166040519015158152f35b34610163576020366003190112610163576004359063ffffffff60e01b82168092036101635760209163402f909960e11b1480156118f8575b15158152f35b6118f2565b60075481101561169e5760075f5260205f2001905f90565b805482101561169e575f5260205f2001905f90565b6003111561193457565b634e487b7160e01b5f52602160045260245ffd5b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b9181601f84011215610163578235916001600160401b038311610163576020838186019501011161016357565b6040906003190112610163576004359060243590565b61010081019081106001600160401b03821117610e6457604052565b60e081019081106001600160401b03821117610e6457604052565b90601f801991011681019081106001600160401b03821117610e6457604052565b90600182811c92168015611a35575b6020831014611a2157565b634e487b7160e01b5f52602260045260245ffd5b91607f1691611a16565b5f9291815491611a4e83611a07565b8083529260018116908115611aa35750600114611a6a57505050565b5f9081526020812093945091925b838310611a89575060209250010190565b600181602092949394548385870101520191019190611a78565b915050602093945060ff929192191683830152151560051b010190565b805482101561169e575f52600760205f20910201905f90565b9291926001600160401b038211610e645760405191611b02601f8201601f1916602001846119e6565b829481845281830111610163578281602093845f960137010152565b9190915f526001602052600460405f2001905f928254935b848110611b9e5760405162461bcd60e51b815260206004820152603360248201527f4c6f616e4865616c7468466565643a20436f76656e616e74206e6f7420666f756044820152721b99081a5b881b185d195cdd081c995c1bdc9d606a1b6064820152608490fd5b61061c611bbb611bae8387611ac0565b5060405192838092611a3f565b60208151910120611bcd368585611ad9565b6020815191012014611be157600101611b36565b9350505060ff6001611bf38484611ac0565b500154166002611c038484611ac0565b5001549360ff6005611c336003611c1a8888611ac0565b500154966004611c2a8289611ac0565b50015496611ac0565b50015416919493929190565b6001600160401b038111610e645760051b60200190565b805182101561169e5760209160051b010190565b805f525f60205260ff60405f20541615611c815750565b6304472d1360e21b5f5260045260245ffd5b9080601f8301121561016357816020611cae93359101611ad9565b90565b9080601f83011215610163578135611cc881611c3f565b92611cd660405194856119e6565b81845260208085019260051b820101918383116101635760208201905b838210611d0257505050505090565b81356001600160401b03811161016357602091611d2487848094880101611c93565b815201910190611cf3565b9080601f83011215610163578135611d4681611c3f565b92611d5460405194856119e6565b81845260208085019260051b82010192831161016357602001905b828210611d7c5750505090565b8135815260209182019101611d6f565b90611d968161192a565b60ff80198354169116179055565b5f5b828110611db257505050565b5f82820155600101611da6565b91601f8211611dcd57505050565b808211611dd957505050565b611e04925f5260205f20916020601f830160051c9210611e06575b601f82910160051c039101611da4565b565b5f9150611df4565b611e188154611a07565b9081611e22575050565b81601f5f9311600114611e33575055565b81835260208320611e5091601f0160051c84190190600101611da4565b8082528160208120915555565b919091828114611f3757611e718354611a07565b6001600160401b038111610e6457611e9381611e8d8454611a07565b84611dbf565b5f93601f8211600114611ed157611ec292939482915f92611ec65750508160011b915f199060031b1c19161790565b9055565b015490505f80610a43565b601f198216905f5260205f2094835f5260205f20915f5b818110611f1f57509583600195969710611f07575b505050811b019055565b01545f1960f88460031b161c191690555f8080611efd565b9192600180602092868b015481550194019201611ee8565b509050565b81811461206f57815491600160401b8311610e64578154838355808410611ff9575b505f5260205f20905f5260205f205f915b838310611f7c5750505050565b600780826001938503611f96575b01920192019190611f6f565b611fa08186611e5d565b611fb260ff8583015416858701611d8c565b600281015460028601556003810154600386015560048101546004860155611fe460ff60058301541660058701611d8c565b611ff46006820160068701611e5d565b611f8a565b806007029060078204036102f957836007026007810485036102f957835f528060205f20019103905f5b828110612031575050611f5e565b806120696006600793850161204581611e0e565b5f60018201555f60028201555f60038201555f60048201555f600582015501611e0e565b01612023565b5050565b5f1981146102f9576001019056fea26469706673582212208e3cb4508792a517948e7f13d1cd639aa1efd4f2616913af8a74fb66c111d18364736f6c63430008210033", sourceMap: "136:15084:16:-:0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;4275:6;;;:::i;:::-;136:15084;;;;;;9000:30;136:15084;;;9000:30;136:15084;;;;;;;9053:50;136:15084;;;9087:15;136:15084;;9053:50;136:15084;;;;;;;;;;;;:::i;:::-;4275:6;;;:::i;:::-;136:15084;;;12920:11;136:15084;;;;;;12965:37;:9;;;:37;:9;;;-1:-1:-1;12965:37:16;;;136:15084;;;:::i;:::-;;;;;;;;:::i;:::-;;;;;;;:::i;:::-;;;;;;-1:-1:-1;;136:15084:16;;;;;;;:::i;:::-;;;;;;;;:::i;:::-;;;;;;;:::i;:::-;;;;;;-1:-1:-1;;136:15084:16;;;;;13125:9;;;;;;136:15084;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;136:15084:16;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;13136:3;136:15084;13171:13;;;;;136:15084;;;;;;;;;;;;;;;;;;;;;;;13236:13;136:15084;;;;;;;;;;;;;;;12920:11;13292:20;;136:15084;;13278:34;;;;:::i;:::-;136:15084;;;:::i;:::-;;13342:22;136:15084;13326:38;;;;:::i;:::-;136:15084;;13110:13;;;;;;;136:15084;;;;;;;;;;;;12965:37;12990:2;12986:6;;12990:2;;;12986:15;12990:2;12986:15;12965:37;;;;12986:15;;;136:15084;;;;;;-1:-1:-1;;136:15084:16;;;;;;;;2777:46;136:15084;;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;353:47:18;-1:-1:-1;;;;;;136:15084:16;;;;;;;;;;;;;:::i;:::-;4275:6;;;;:::i;:::-;136:15084;;;11412:11;136:15084;;;;;;11398:33;;136:15084;;;;;11521:13;136:15084;;;;;;;;;;;;;;11412:11;11586:20;;136:15084;;;11732:20;136:15084;11620:19;;;136:15084;;11653:29;;;;136:15084;;11696:22;;;136:15084;;;;;11732:20;;;;;136:15084;:::i;:::-;;;;:::i;:::-;;;;;;;;;:::i;:::-;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;-1:-1:-1;;;136:15084:16;;;;;;;;;;;;;;;;;-1:-1:-1;;;136:15084:16;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;4275:6;;;:::i;:::-;136:15084;;;;;;;;;10032:37;136:15084;;;;;;:::i;:::-;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;:::i;:::-;;;;:::i;:::-;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;;;2918:47;136:15084;;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;;:::i;:::-;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;;:::i;:::-;5060:40;;136:15084;;;;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;:::i;:::-;;;;;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;:::i;:::-;;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;:::i;:::-;;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;:::i;:::-;;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;:::i;:::-;;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;:::i;:::-;;;;;;;;5454:19;136:15084;5454:31;5450:109;;136:15084;;;5585:19;136:15084;;;;5615:14;136:15084;5585:51;;;;;:126;;;136:15084;5585:195;;;;136:15084;5585:270;;;;136:15084;5585:335;;;;136:15084;5585:399;;;;136:15084;5568:492;;;136:15084;;;;6104:3;6073:34;;6069:138;;136:15084;;;;;;;;;;;;;;;;6316:13;136:15084;;;;;;;;;;;;;;;;;;6436:15;136:15084;6411:22;;136:15084;6461:18;6316:13;6461:18;;136:15084;6510:42;136:15084;;;;;;;:::i;:::-;;6510:20;;:42;:::i;:::-;6562:40;136:15084;;;;;;;:::i;:::-;;6562:19;;:40;:::i;:::-;136:15084;;;;6612:29;;;136:15084;6705:19;136:15084;;;-1:-1:-1;;;;;136:15084:16;;;;;6682:20;136:15084;6682:20;;;136:15084;;:::i;:::-;6682:20;;;136:15084;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;6682:20;;;136:15084;;;;6734:15;;;136:15084;;-1:-1:-1;;136:15084:16;;;;;-1:-1:-1;;6819:3:16;136:15084;;;6791:19;136:15084;;6787:30;;;;;6913:22;;;;:::i;:::-;;136:15084;6961:17;136:15084;;;;6961:14;:17;:::i;:::-;136:15084;;;;:::i;:::-;7013:25;136:15084;;;;7013:22;:25;:::i;:::-;136:15084;7067:19;136:15084;;;;7067:16;:19;:::i;:::-;136:15084;7121:25;136:15084;;;;7121:22;:25;:::i;:::-;136:15084;;7171:15;136:15084;;;;7171:12;:15;:::i;:::-;136:15084;;;;;:::i;:::-;7211:14;136:15084;;;;7211:11;:14;:::i;:::-;;136:15084;;;;;;;:::i;:::-;;;;;;:::i;:::-;;6866:374;;136:15084;;6866:374;;136:15084;;6866:374;;136:15084;;6866:374;;136:15084;;;;:::i;:::-;;6866:374;;136:15084;;6866:374;;136:15084;;6838:22;;136:15084;-1:-1:-1;;;136:15084:16;;;;;;;;;;;6838:22;;136:15084;;6838:22;;136:15084;:::i;:::-;;;;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;:::i;:::-;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;6866:374;;136:15084;;;;:::i;:::-;;;;;:::i;:::-;;6866:374;;136:15084;6316:13;136:15084;;;;6866:374;;136:15084;;;;;;6866:374;;136:15084;;;;;;;6866:374;;136:15084;;;;:::i;:::-;;;;;:::i;:::-;6866:374;136:15084;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;6612:29;136:15084;;;;:::i;:::-;6612:29;136:15084;;;:::i;:::-;;;;;;;;;;6612:29;136:15084;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;6316:13;7260:17;136:15084;;;;7260:14;:17;:::i;:::-;136:15084;;;;:::i;:::-;;;;:::i;:::-;7260:42;6316:13;;136:15084;;7327:282;136:15084;7397:22;136:15084;;;;7397:19;:22;:::i;:::-;;7441:25;136:15084;;;;7441:22;:25;:::i;:::-;136:15084;7488:19;136:15084;;;;7488:16;:19;:::i;:::-;136:15084;7529:25;136:15084;;;;7529:22;:25;:::i;:::-;136:15084;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;6436:15;136:15084;;;;7327:282;;;7256:697;136:15084;6772:13;;;;;7256:697;136:15084;7634:17;136:15084;;;;7634:14;:17;:::i;:::-;136:15084;;;;:::i;:::-;;;;:::i;:::-;7634:43;7256:697;7630:323;136:15084;;7702:236;136:15084;7773:22;136:15084;;;;7773:19;:22;:::i;:::-;;7817:25;136:15084;;;;7817:22;:25;:::i;:::-;136:15084;7864:19;136:15084;;;;7864:16;:19;:::i;:::-;136:15084;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;6436:15;136:15084;;;;7702:236;;;7256:697;;136:15084;;;;-1:-1:-1;136:15084:16;;;;;6612:29;136:15084;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;;;;;;;;;;6612:29;136:15084;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;6787:30;;;136:15084;;;;;;;;;;;;;;;6767:1196;136:15084;;;;;;;;;;;;8020:27;136:15084;;8020:27;:::i;:::-;136:15084;;6316:13;136:15084;;;;;;;:::i;:::-;;;;:::i;:::-;8061:44;6316:13;;136:15084;;;;;;;;;;8121:27;136:15084;;8121:27;:::i;:::-;136:15084;;8057:212;136:15084;;;;;;;;;:::i;:::-;;;;6734:15;136:15084;;;;;;;;;;;;:::i;:::-;6316:13;13805:34;;;;;:56;;8057:212;13801:377;;;136:15084;;;;;;6734:15;136:15084;;;;;;;;;;;;;;6682:20;136:15084;-1:-1:-1;;;136:15084:16;;;;;;;;;;;6682:20;136:15084;6682:20;136:15084;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;13801:377;136:15084;;;;;;;;;;;;;8347:26;8343:209;;13801:377;136:15084;8567:229;136:15084;;;;;;;;;;;;:::i;:::-;;;;;;;;;;:::i;:::-;;;;;;;;;;;;:::i;:::-;;;;;;;;:::i;:::-;;;;;;;;;6436:15;136:15084;;;;8567:229;136:15084;8343:209;136:15084;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;136:15084:16;;;;;8567:229;136:15084;;;;;;;;;;;;:::i;:::-;;;;;8487:54;136:15084;;;6436:15;136:15084;;8487:54;8343:209;;;;;13801:377;136:15084;;;:::i;:::-;13965:34;:55;;;;13801:377;13961:217;;;13801:377;;;;13961:217;136:15084;;;;6734:15;136:15084;;;;;;;;;;;;6682:20;136:15084;14313:13;136:15084;14328:10;;;;;;14308:234;136:15084;;;;14128:39;136:15084;;;6436:15;136:15084;;14128:39;13961:217;;;14340:3;14363:17;;;;:::i;:::-;136:15084;;;;;;14363:27;14359:173;;136:15084;;14313:13;;14359:173;136:15084;;;;;;;;;;;;14410:17;14430:26;136:15084;14430:26;;:::i;:::-;136:15084;;;;;;14410:17;;:::i;136:15084::-;;;6682:20;136:15084;;;;;-1:-1:-1;;136:15084:16;;;;:::i;:::-;;;;;;;;;;;;;;6682:20;136:15084;14512:5;;;;;136:15084;;;;;;;;;;;;13965:55;;;;;;13805:56;13843:18;;;13805:56;;8057:212;136:15084;;;;;;;;:::i;:::-;;;;:::i;:::-;8169:45;8057:212;8165:104;136:15084;;;;6612:29;136:15084;;;;;8230:28;136:15084;;8230:28;:::i;:::-;136:15084;;8057:212;;136:15084;6734:15;136:15084;;;;;;;;6411:22;;136:15084;;;;;6316:13;6461:18;;136:15084;6316:13;136:15084;;;;6510:20;136:15084;6510:20;;136:15084;;;;;;:::i;:::-;;;6838:22;;136:15084;;;;:::i;:::-;;6562:19;136:15084;6562:19;;136:15084;;;;;;:::i;:::-;6612:29;;;136:15084;6612:29;136:15084;;;;6682:20;;;;136:15084;;;:::i;:::-;;6734:15;;136:15084;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;136:15084:16;;;;;6682:20;;;136:15084;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;;;;;;;;;;;;;;;;;;;;;;6682:20;;;136:15084;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;6069:138;136:15084;;6130:66;;;136:15084;6130:66;136:15084;;;;;;6130:66;5568:492;136:15084;;6016:33;;;136:15084;6016:33;136:15084;;;;6016:33;5585:399;136:15084;;;;;5966:11;136:15084;5936:48;;5585:399;;;:335;136:15084;;;5901:12;136:15084;5871:49;;;;-1:-1:-1;5585:335:16;;:270;136:15084;;;5826:22;136:15084;5796:59;;;;-1:-1:-1;5585:270:16;;:195;136:15084;;;5757:16;136:15084;5727:53;;;;-1:-1:-1;5585:195:16;;:126;136:15084;;;5682:22;136:15084;5652:59;;;;-1:-1:-1;5585:126:16;;5450:109;136:15084;;5508:40;;;136:15084;5508:40;136:15084;;;;5508:40;136:15084;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;13507:14;136:15084;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;10082:930;136:15084;;;;;;:::i;:::-;4275:6;;;;:::i;:::-;10082:930;:::i;:::-;136:15084;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;4275:6;;;:::i;:::-;136:15084;;;;;;;;;;12079:20;;;136:15084;;12127:19;136:15084;12127:19;;;136:15084;;12184:29;136:15084;12184:29;;;136:15084;12240:22;;136:15084;;;;12079:20;136:15084;;;;;;;;;;;;;;;;;;;;;12184:29;136:15084;;;;;;;;;;;;;:::i;:::-;;;;12004:413;;136:15084;;;;:::i;:::-;;;;12004:413;;136:15084;;;;:::i;:::-;;;;12004:413;;136:15084;;;;12004:413;;136:15084;;;;12004:413;;136:15084;;;;12004:413;;136:15084;;;;12004:413;;136:15084;;;;;;;;;;;;;:::i;:::-;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;307:40:18;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;2881:31;136:15084;2881:31;;;;;;136:15084;;;;;;2881:31;136:15084;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;4275:6;;;:::i;:::-;136:15084;;;;;;;;;9609:20;;;136:15084;;;9643:19;;;136:15084;;9676:29;136:15084;9787:20;9676:29;;;136:15084;;9719:22;;136:15084;9755:18;;;136:15084;9821:15;136:15084;;9821:15;;;136:15084;;;;;;9787:20;;;;;136:15084;:::i;:::-;;;;:::i;:::-;;;;;;;;;:::i;:::-;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;;;3008:42;136:15084;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;;;12630:14;136:15084;;;;;;;;12630:14;136:15084;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;136:15084:16;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;2971:31;136:15084;2971:31;;;;;;136:15084;2971:31;;:::i;:::-;136:15084;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;;;;;;;;;;;;;;;-1:-1:-1;;;15134:37:16;:77;;;;136:15084;;;;;;15134:77;;;136:15084;2971:31;136:15084;;;;;;2971:31;-1:-1:-1;136:15084:16;;-1:-1:-1;136:15084:16;;;-1:-1:-1;136:15084:16;:::o;:::-;;;;;;;;-1:-1:-1;136:15084:16;;-1:-1:-1;136:15084:16;;;-1:-1:-1;136:15084:16;:::o;:::-;;-1:-1:-1;136:15084:16;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;136:15084:16;;;;;;;;-1:-1:-1;;136:15084:16;;;;:::o;:::-;;;;;;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;:::o;:::-;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;:::o;:::-;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;:::o;:::-;;;;;;;;;;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;:::o;:::-;-1:-1:-1;136:15084:16;;;;;;;;-1:-1:-1;136:15084:16;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;-1:-1:-1;136:15084:16;;;-1:-1:-1;136:15084:16;;;;;-1:-1:-1;136:15084:16;:::o;:::-;;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;;-1:-1:-1;;136:15084:16;;;;;:::i;:::-;;;;;;;;;;;;;;;;;-1:-1:-1;136:15084:16;;;;;;:::o;10082:930::-;;;;-1:-1:-1;136:15084:16;10465:13;136:15084;;10465:37;136:15084;-1:-1:-1;136:15084:16;10465:37;10517:13;-1:-1:-1;136:15084:16;;;10512:423;10532:18;;;;;;136:15084;;-1:-1:-1;;;10944:61:16;;136:15084;10465:37;10944:61;;136:15084;;;;;;;;;;;-1:-1:-1;;;136:15084:16;;;;10944:61;;;10552:3;136:15084;;10591:10;;;;:::i;:::-;136:15084;;;;;;;;:::i;:::-;;;;;;10575:41;136:15084;;;;;:::i;:::-;;;;;;10620:30;10575:75;10571:354;;10465:13;136:15084;10517:13;;10571:354;10699:10;;;;136:15084;10465:13;10699:10;;;;:::i;:::-;:17;;136:15084;;10738:26;:10;;;;:::i;:::-;:26;;136:15084;10786:10;136:15084;10876:16;:10;10786:20;:10;;;;:::i;:::-;:20;;136:15084;10828:10;10465:37;10828:10;;;;:::i;:::-;:26;;136:15084;10876:10;;:::i;:::-;:16;;136:15084;;10670:240;;;;;;:::o;136:15084::-;-1:-1:-1;;;;;136:15084:16;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;:::o;14554:154::-;136:15084;14625:11;136:15084;14625:11;136:15084;;;;14625:11;136:15084;;;14624:20;14620:82;;14554:154;:::o;14620:82::-;14667:24;;;14625:11;14667:24;;136:15084;;14625:11;14667:24;136:15084;;;;;;;;;;;;;;;;;;:::i;:::-;;:::o;:::-;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;:::o;:::-;;;-1:-1:-1;136:15084:16;;-1:-1:-1;136:15084:16;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;:::o;:::-;-1:-1:-1;;;136:15084:16;;;;;;;:::i;:::-;;;;;;;:::o;:::-;;;-1:-1:-1;136:15084:16;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;:::i;:::-;-1:-1:-1;;;;;136:15084:16;;;;;;;;;;:::i;:::-;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;-1:-1:-1;136:15084:16;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::o;:::-;;;;;;;;;-1:-1:-1;;;136:15084:16;;;;;;;;;;;;;;;;-1:-1:-1;136:15084:16;;-1:-1:-1;136:15084:16;;-1:-1:-1;136:15084:16;;-1:-1:-1;136:15084:16;-1:-1:-1;136:15084:16;;;;;;;;;;;:::o;:::-;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;;;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;136:15084:16;;;-1:-1:-1;136:15084:16;;;;;-1:-1:-1;136:15084:16;;;;;;;;;;;;;;;;;;;;;:::i;:::-;-1:-1:-1;136:15084:16;;;;-1:-1:-1;136:15084:16;;;;-1:-1:-1;136:15084:16;;;;-1:-1:-1;136:15084:16;;;;-1:-1:-1;136:15084:16;;;;;;:::i;:::-;;;;;;;:::o;:::-;-1:-1:-1;;136:15084:16;;;;;;;:::o", linkReferences: {}, immutableReferences: { "37646": [{ start: 5653, length: 32 }], "37648": [{ start: 869, length: 32 }] } },
+  methodIdentifiers: { "EXPECTED_AUTHOR()": "5780bd93", "EXPECTED_WORKFLOW_NAME()": "d71d79fe", "activeBreaches(uint256)": "233eaca8", "breachCount(bytes32)": "cf1a2058", "deactivateLoan(bytes32)": "fbf46975", "getActiveBreaches()": "29b5e21b", "getCovenantStatus(bytes32,string)": "62986851", "getHistoricalReport(bytes32,uint256)": "d4e24d38", "getLatestCovenantReports(bytes32)": "bd8f63ea", "getLatestReport(bytes32)": "4def3188", "getLoanSummary(bytes32)": "57eebf31", "getMonitoredLoanCount()": "63604d89", "getRecentStatusHistory(bytes32,uint256)": "e21fcc9c", "isInBreach(bytes32)": "47bac1fc", "isLoanInBreach(bytes32)": "3dd59137", "isLoanMonitored(bytes32)": "203830b1", "monitoredLoans(uint256)": "51a34f79", "onReport(bytes,bytes)": "805f2132", "reportCount(bytes32)": "d750b202", "supportsInterface(bytes4)": "01ffc9a7", "warningCount(bytes32)": "835369c3" },
+  rawMetadata: '{"compiler":{"version":"0.8.33+commit.64118f21"},"language":"Solidity","output":{"abi":[{"inputs":[{"internalType":"address","name":"_expectedAuthor","type":"address"},{"internalType":"bytes10","name":"_expectedWorkflowName","type":"bytes10"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"ArrayLengthMismatch","type":"error"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"AtleastOneCovenantRequired","type":"error"},{"inputs":[{"internalType":"address","name":"received","type":"address"},{"internalType":"address","name":"expected","type":"address"}],"name":"InvalidAuthor","type":"error"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"uint256","name":"score","type":"uint256"}],"name":"InvalidConfidenceScore","type":"error"},{"inputs":[{"internalType":"bytes10","name":"received","type":"bytes10"},{"internalType":"bytes10","name":"expected","type":"bytes10"}],"name":"InvalidWorkflowName","type":"error"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"LoanNotMonitored","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"}],"name":"BreachResolved","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"string","name":"covenantName","type":"string"},{"indexed":false,"internalType":"uint256","name":"calculatedValue","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"threshold","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"confidenceScore","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"}],"name":"CovenantBreach","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"string","name":"covenantName","type":"string"},{"indexed":false,"internalType":"uint256","name":"calculatedValue","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"threshold","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"}],"name":"CovenantWarning","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"uint256","name":"reportIndex","type":"uint256"},{"indexed":false,"internalType":"enum LoanHealthFeed.CovenantStatus","name":"overallStatus","type":"uint8"},{"indexed":false,"internalType":"enum LoanHealthFeed.TrendIndicator","name":"overallTrend","type":"uint8"},{"indexed":false,"internalType":"uint256","name":"overallConfidenceScore","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"}],"name":"LoanHealthReportPublished","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"}],"name":"LoanMonitoringActivated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"loanId","type":"bytes32"},{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"}],"name":"LoanMonitoringDeactivated","type":"event"},{"inputs":[],"name":"EXPECTED_AUTHOR","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"EXPECTED_WORKFLOW_NAME","outputs":[{"internalType":"bytes10","name":"","type":"bytes10"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"activeBreaches","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"breachCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"deactivateLoan","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"getActiveBreaches","outputs":[{"internalType":"bytes32[]","name":"","type":"bytes32[]"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"string","name":"covenantName","type":"string"}],"name":"getCovenantStatus","outputs":[{"internalType":"enum LoanHealthFeed.CovenantStatus","name":"status","type":"uint8"},{"internalType":"uint256","name":"calculatedValue","type":"uint256"},{"internalType":"uint256","name":"threshold","type":"uint256"},{"internalType":"uint256","name":"confidenceScore","type":"uint256"},{"internalType":"enum LoanHealthFeed.TrendIndicator","name":"trend","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"uint256","name":"reportIndex","type":"uint256"}],"name":"getHistoricalReport","outputs":[{"internalType":"enum LoanHealthFeed.CovenantStatus","name":"overallStatus","type":"uint8"},{"internalType":"enum LoanHealthFeed.TrendIndicator","name":"overallTrend","type":"uint8"},{"internalType":"uint256","name":"overallConfidenceScore","type":"uint256"},{"internalType":"uint256","name":"reportTimestamp","type":"uint256"},{"internalType":"string","name":"riskNarrative","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"getLatestCovenantReports","outputs":[{"components":[{"internalType":"string","name":"covenantName","type":"string"},{"internalType":"enum LoanHealthFeed.CovenantStatus","name":"status","type":"uint8"},{"internalType":"uint256","name":"calculatedValue","type":"uint256"},{"internalType":"uint256","name":"threshold","type":"uint256"},{"internalType":"uint256","name":"confidenceScore","type":"uint256"},{"internalType":"enum LoanHealthFeed.TrendIndicator","name":"trend","type":"uint8"},{"internalType":"string","name":"notes","type":"string"}],"internalType":"struct LoanHealthFeed.CovenantReport[]","name":"","type":"tuple[]"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"getLatestReport","outputs":[{"internalType":"enum LoanHealthFeed.CovenantStatus","name":"overallStatus","type":"uint8"},{"internalType":"enum LoanHealthFeed.TrendIndicator","name":"overallTrend","type":"uint8"},{"internalType":"uint256","name":"overallConfidenceScore","type":"uint256"},{"internalType":"uint256","name":"reportTimestamp","type":"uint256"},{"internalType":"uint256","name":"reportIndex","type":"uint256"},{"internalType":"string","name":"riskNarrative","type":"string"},{"internalType":"bool","name":"isActive","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"getLoanSummary","outputs":[{"components":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"enum LoanHealthFeed.CovenantStatus","name":"overallStatus","type":"uint8"},{"internalType":"enum LoanHealthFeed.TrendIndicator","name":"overallTrend","type":"uint8"},{"internalType":"uint256","name":"overallConfidenceScore","type":"uint256"},{"internalType":"uint256","name":"lastUpdated","type":"uint256"},{"internalType":"uint256","name":"totalReports","type":"uint256"},{"internalType":"uint256","name":"totalBreaches","type":"uint256"},{"internalType":"uint256","name":"totalWarnings","type":"uint256"}],"internalType":"struct LoanHealthFeed.LoanHealthSummary","name":"","type":"tuple"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getMonitoredLoanCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"},{"internalType":"uint256","name":"n","type":"uint256"}],"name":"getRecentStatusHistory","outputs":[{"internalType":"enum LoanHealthFeed.CovenantStatus[]","name":"statuses","type":"uint8[]"},{"internalType":"uint256[]","name":"timestamps","type":"uint256[]"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"isInBreach","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"isLoanInBreach","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"loanId","type":"bytes32"}],"name":"isLoanMonitored","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"monitoredLoans","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes","name":"metadata","type":"bytes"},{"internalType":"bytes","name":"report","type":"bytes"}],"name":"onReport","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"reportCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes4","name":"interfaceId","type":"bytes4"}],"name":"supportsInterface","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"pure","type":"function"},{"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"warningCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}],"devdoc":{"kind":"dev","methods":{"onReport(bytes,bytes)":{"params":{"metadata":"Encoded metadata (not used in testing version)","report":"Encoded report containing loan and covenant details"}},"supportsInterface(bytes4)":{"details":"Overrides PolicyProtected\'s supportsInterface to include CRE receiver interface.","params":{"interfaceId":"The interface identifier to check."},"returns":{"_0":"True if the interface is supported."}}},"version":1},"userdoc":{"kind":"user","methods":{"deactivateLoan(bytes32)":{"notice":"Deactivate monitoring for a loan (e.g., loan fully repaid)"},"onReport(bytes,bytes)":{"notice":"Receive report from Forwarder"},"supportsInterface(bytes4)":{"notice":"ERC165 interface support."}},"version":1}},"settings":{"compilationTarget":{"src/LoanHealthFeed.sol":"LoanHealthFeed"},"evmVersion":"prague","libraries":{},"metadata":{"bytecodeHash":"ipfs"},"optimizer":{"enabled":true,"runs":200},"remappings":[":@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",":erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/",":forge-std/=lib/forge-std/src/",":halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/",":openzeppelin-contracts/=lib/openzeppelin-contracts/"],"viaIR":true},"sources":{"src/LoanHealthFeed.sol":{"keccak256":"0xefb690a0efb781f1913048782723b1c00a66804a6c7b8bf7bdae87116ba21739","license":"UNLICENSED","urls":["bzz-raw://ed1865a3769aa4ae883ffd8f4d9109d2ca5f6327df2c20aa2f4d9a2c38cf652e","dweb:/ipfs/QmUQ8nNvryhTSyHy3j7MthLWebBRXgD8tT42mwYqfS1vVE"]},"src/interfaces/IReceiverTemplate.sol":{"keccak256":"0xa16d67521a3cc2cf4cfcb52e78fedaee2e2179fb8ab92f2110f2ba6f424e547b","license":"MIT","urls":["bzz-raw://f5f4480643f1bc11196404d1960b6d4b6531e087d3631a7361352e2f7a55f661","dweb:/ipfs/QmdvCPcMhrCq4drsP3dt1rVa7FvH2KS2KS1Za7g8LKWgZE"]}},"version":1}',
+  metadata: { compiler: { version: "0.8.33+commit.64118f21" }, language: "Solidity", output: { abi: [{ inputs: [{ internalType: "address", name: "_expectedAuthor", type: "address" }, { internalType: "bytes10", name: "_expectedWorkflowName", type: "bytes10" }], stateMutability: "nonpayable", type: "constructor" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], type: "error", name: "ArrayLengthMismatch" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], type: "error", name: "AtleastOneCovenantRequired" }, { inputs: [{ internalType: "address", name: "received", type: "address" }, { internalType: "address", name: "expected", type: "address" }], type: "error", name: "InvalidAuthor" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "uint256", name: "score", type: "uint256" }], type: "error", name: "InvalidConfidenceScore" }, { inputs: [{ internalType: "bytes10", name: "received", type: "bytes10" }, { internalType: "bytes10", name: "expected", type: "bytes10" }], type: "error", name: "InvalidWorkflowName" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], type: "error", name: "LoanNotMonitored" }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "uint256", name: "timestamp", type: "uint256", indexed: false }], type: "event", name: "BreachResolved", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "string", name: "covenantName", type: "string", indexed: false }, { internalType: "uint256", name: "calculatedValue", type: "uint256", indexed: false }, { internalType: "uint256", name: "threshold", type: "uint256", indexed: false }, { internalType: "uint256", name: "confidenceScore", type: "uint256", indexed: false }, { internalType: "uint256", name: "timestamp", type: "uint256", indexed: false }], type: "event", name: "CovenantBreach", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "string", name: "covenantName", type: "string", indexed: false }, { internalType: "uint256", name: "calculatedValue", type: "uint256", indexed: false }, { internalType: "uint256", name: "threshold", type: "uint256", indexed: false }, { internalType: "uint256", name: "timestamp", type: "uint256", indexed: false }], type: "event", name: "CovenantWarning", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "uint256", name: "reportIndex", type: "uint256", indexed: false }, { internalType: "enum LoanHealthFeed.CovenantStatus", name: "overallStatus", type: "uint8", indexed: false }, { internalType: "enum LoanHealthFeed.TrendIndicator", name: "overallTrend", type: "uint8", indexed: false }, { internalType: "uint256", name: "overallConfidenceScore", type: "uint256", indexed: false }, { internalType: "uint256", name: "timestamp", type: "uint256", indexed: false }], type: "event", name: "LoanHealthReportPublished", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "uint256", name: "timestamp", type: "uint256", indexed: false }], type: "event", name: "LoanMonitoringActivated", anonymous: false }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32", indexed: true }, { internalType: "uint256", name: "timestamp", type: "uint256", indexed: false }], type: "event", name: "LoanMonitoringDeactivated", anonymous: false }, { inputs: [], stateMutability: "view", type: "function", name: "EXPECTED_AUTHOR", outputs: [{ internalType: "address", name: "", type: "address" }] }, { inputs: [], stateMutability: "view", type: "function", name: "EXPECTED_WORKFLOW_NAME", outputs: [{ internalType: "bytes10", name: "", type: "bytes10" }] }, { inputs: [{ internalType: "uint256", name: "", type: "uint256" }], stateMutability: "view", type: "function", name: "activeBreaches", outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }] }, { inputs: [{ internalType: "bytes32", name: "", type: "bytes32" }], stateMutability: "view", type: "function", name: "breachCount", outputs: [{ internalType: "uint256", name: "", type: "uint256" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "nonpayable", type: "function", name: "deactivateLoan" }, { inputs: [], stateMutability: "view", type: "function", name: "getActiveBreaches", outputs: [{ internalType: "bytes32[]", name: "", type: "bytes32[]" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "string", name: "covenantName", type: "string" }], stateMutability: "view", type: "function", name: "getCovenantStatus", outputs: [{ internalType: "enum LoanHealthFeed.CovenantStatus", name: "status", type: "uint8" }, { internalType: "uint256", name: "calculatedValue", type: "uint256" }, { internalType: "uint256", name: "threshold", type: "uint256" }, { internalType: "uint256", name: "confidenceScore", type: "uint256" }, { internalType: "enum LoanHealthFeed.TrendIndicator", name: "trend", type: "uint8" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "uint256", name: "reportIndex", type: "uint256" }], stateMutability: "view", type: "function", name: "getHistoricalReport", outputs: [{ internalType: "enum LoanHealthFeed.CovenantStatus", name: "overallStatus", type: "uint8" }, { internalType: "enum LoanHealthFeed.TrendIndicator", name: "overallTrend", type: "uint8" }, { internalType: "uint256", name: "overallConfidenceScore", type: "uint256" }, { internalType: "uint256", name: "reportTimestamp", type: "uint256" }, { internalType: "string", name: "riskNarrative", type: "string" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "view", type: "function", name: "getLatestCovenantReports", outputs: [{ internalType: "struct LoanHealthFeed.CovenantReport[]", name: "", type: "tuple[]", components: [{ internalType: "string", name: "covenantName", type: "string" }, { internalType: "enum LoanHealthFeed.CovenantStatus", name: "status", type: "uint8" }, { internalType: "uint256", name: "calculatedValue", type: "uint256" }, { internalType: "uint256", name: "threshold", type: "uint256" }, { internalType: "uint256", name: "confidenceScore", type: "uint256" }, { internalType: "enum LoanHealthFeed.TrendIndicator", name: "trend", type: "uint8" }, { internalType: "string", name: "notes", type: "string" }] }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "view", type: "function", name: "getLatestReport", outputs: [{ internalType: "enum LoanHealthFeed.CovenantStatus", name: "overallStatus", type: "uint8" }, { internalType: "enum LoanHealthFeed.TrendIndicator", name: "overallTrend", type: "uint8" }, { internalType: "uint256", name: "overallConfidenceScore", type: "uint256" }, { internalType: "uint256", name: "reportTimestamp", type: "uint256" }, { internalType: "uint256", name: "reportIndex", type: "uint256" }, { internalType: "string", name: "riskNarrative", type: "string" }, { internalType: "bool", name: "isActive", type: "bool" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "view", type: "function", name: "getLoanSummary", outputs: [{ internalType: "struct LoanHealthFeed.LoanHealthSummary", name: "", type: "tuple", components: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "enum LoanHealthFeed.CovenantStatus", name: "overallStatus", type: "uint8" }, { internalType: "enum LoanHealthFeed.TrendIndicator", name: "overallTrend", type: "uint8" }, { internalType: "uint256", name: "overallConfidenceScore", type: "uint256" }, { internalType: "uint256", name: "lastUpdated", type: "uint256" }, { internalType: "uint256", name: "totalReports", type: "uint256" }, { internalType: "uint256", name: "totalBreaches", type: "uint256" }, { internalType: "uint256", name: "totalWarnings", type: "uint256" }] }] }, { inputs: [], stateMutability: "view", type: "function", name: "getMonitoredLoanCount", outputs: [{ internalType: "uint256", name: "", type: "uint256" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }, { internalType: "uint256", name: "n", type: "uint256" }], stateMutability: "view", type: "function", name: "getRecentStatusHistory", outputs: [{ internalType: "enum LoanHealthFeed.CovenantStatus[]", name: "statuses", type: "uint8[]" }, { internalType: "uint256[]", name: "timestamps", type: "uint256[]" }] }, { inputs: [{ internalType: "bytes32", name: "", type: "bytes32" }], stateMutability: "view", type: "function", name: "isInBreach", outputs: [{ internalType: "bool", name: "", type: "bool" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "view", type: "function", name: "isLoanInBreach", outputs: [{ internalType: "bool", name: "", type: "bool" }] }, { inputs: [{ internalType: "bytes32", name: "loanId", type: "bytes32" }], stateMutability: "view", type: "function", name: "isLoanMonitored", outputs: [{ internalType: "bool", name: "", type: "bool" }] }, { inputs: [{ internalType: "uint256", name: "", type: "uint256" }], stateMutability: "view", type: "function", name: "monitoredLoans", outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }] }, { inputs: [{ internalType: "bytes", name: "metadata", type: "bytes" }, { internalType: "bytes", name: "report", type: "bytes" }], stateMutability: "nonpayable", type: "function", name: "onReport" }, { inputs: [{ internalType: "bytes32", name: "", type: "bytes32" }], stateMutability: "view", type: "function", name: "reportCount", outputs: [{ internalType: "uint256", name: "", type: "uint256" }] }, { inputs: [{ internalType: "bytes4", name: "interfaceId", type: "bytes4" }], stateMutability: "pure", type: "function", name: "supportsInterface", outputs: [{ internalType: "bool", name: "", type: "bool" }] }, { inputs: [{ internalType: "bytes32", name: "", type: "bytes32" }], stateMutability: "view", type: "function", name: "warningCount", outputs: [{ internalType: "uint256", name: "", type: "uint256" }] }], devdoc: { kind: "dev", methods: { "onReport(bytes,bytes)": { params: { metadata: "Encoded metadata (not used in testing version)", report: "Encoded report containing loan and covenant details" } }, "supportsInterface(bytes4)": { details: "Overrides PolicyProtected's supportsInterface to include CRE receiver interface.", params: { interfaceId: "The interface identifier to check." }, returns: { _0: "True if the interface is supported." } } }, version: 1 }, userdoc: { kind: "user", methods: { "deactivateLoan(bytes32)": { notice: "Deactivate monitoring for a loan (e.g., loan fully repaid)" }, "onReport(bytes,bytes)": { notice: "Receive report from Forwarder" }, "supportsInterface(bytes4)": { notice: "ERC165 interface support." } }, version: 1 } }, settings: { remappings: ["@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/", "erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/", "forge-std/=lib/forge-std/src/", "halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/", "openzeppelin-contracts/=lib/openzeppelin-contracts/"], optimizer: { enabled: true, runs: 200 }, metadata: { bytecodeHash: "ipfs" }, compilationTarget: { "src/LoanHealthFeed.sol": "LoanHealthFeed" }, evmVersion: "prague", libraries: {}, viaIR: true }, sources: { "src/LoanHealthFeed.sol": { keccak256: "0xefb690a0efb781f1913048782723b1c00a66804a6c7b8bf7bdae87116ba21739", urls: ["bzz-raw://ed1865a3769aa4ae883ffd8f4d9109d2ca5f6327df2c20aa2f4d9a2c38cf652e", "dweb:/ipfs/QmUQ8nNvryhTSyHy3j7MthLWebBRXgD8tT42mwYqfS1vVE"], license: "UNLICENSED" }, "src/interfaces/IReceiverTemplate.sol": { keccak256: "0xa16d67521a3cc2cf4cfcb52e78fedaee2e2179fb8ab92f2110f2ba6f424e547b", urls: ["bzz-raw://f5f4480643f1bc11196404d1960b6d4b6531e087d3631a7361352e2f7a55f661", "dweb:/ipfs/QmdvCPcMhrCq4drsP3dt1rVa7FvH2KS2KS1Za7g8LKWgZE"], license: "MIT" } }, version: 1 },
+  id: 16
+};
+var LoanHealthFeedAbi = LoanHealthFeed_default.abi;
 var configSchema = exports_external.object({
-  aiProvider: exports_external.enum(["claude", "openai"]),
-  aiModel: exports_external.string(),
-  aiApiKey: exports_external.string().default(""),
+  cronExpression: exports_external.string(),
+  reportingDate: exports_external.string().default(""),
+  loanId: exports_external.string(),
+  financialApiUrl: exports_external.string(),
   loanRegistryAddress: exports_external.string(),
+  loanHealthFeedAddress: exports_external.string(),
   chainSelectorName: exports_external.string(),
-  gasLimit: exports_external.string()
+  gasLimit: exports_external.string(),
+  aiProvider: exports_external.enum(["claude", "openai"]),
+  aiModel: exports_external.string()
 });
-var COVENANT_EXTRACTION_SYSTEM_PROMPT = `
-You are a financial document analysis system specialised in extracting loan covenant data.
+function stripMarkdownFences(text) {
+  return text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+}
+var STATUS_MAP = { PASS: 0, WARNING: 1, BREACH: 2 };
+var TREND_MAP = { IMPROVING: 0, STABLE: 1, DETERIORATING: 2 };
+var COVENANT_EVALUATION_SYSTEM_PROMPT = `
+You are a financial covenant evaluation system for commercial real estate loan monitoring.
 
-Given a loan agreement document, extract every financial covenant and return them as a JSON object.
+Given borrower financial metrics and a set of financial covenant schemas, evaluate each covenant and return a structured JSON assessment.
 
 OUTPUT FORMAT (CRITICAL):
 - Respond ONLY with a single valid JSON object — no markdown, no code fences, no prose.
 - Use this exact structure:
 
 {
-  "reportingFrequencyDays": <integer, e.g. 30>,
-  "covenantNames":       ["name1", "name2"],
-  "metricDefinitions":   ["formula1", "formula2"],
-  "thresholds":          [<decimal>, <decimal>],
-  "thresholdTypes":      ["MAX" or "MIN", ...],
-  "ebitdaAdjustments":  ["adjustment or empty string", ...]
+  "covenantEvaluations": [
+    {
+      "covenantName": "<string — exact covenant name>",
+      "calculatedValue": <number — computed metric value, e.g. 3.42>,
+      "status": "PASS" | "WARNING" | "BREACH",
+      "trend": "IMPROVING" | "STABLE" | "DETERIORATING",
+      "confidenceScore": <integer 0-100>,
+      "notes": "<string — brief explanation>"
+    }
+  ],
+  "overallStatus": "PASS" | "WARNING" | "BREACH",
+  "overallTrend": "IMPROVING" | "STABLE" | "DETERIORATING",
+  "overallConfidenceScore": <integer 0-100>,
+  "riskNarrative": "<string — paragraph summarising overall credit risk>"
 }
 
-RULES:
-- All five arrays must have identical length (one entry per covenant).
-- thresholds are plain decimal numbers representing the covenant limit, e.g.:
-    4.5  →  4.5× leverage ratio
-    1.25 →  1.25× coverage ratio (i.e. 125 %)
-- thresholdTypes must be exactly "MAX" (metric must stay ≤ threshold)
-  or "MIN" (metric must stay ≥ threshold).
-- ebitdaAdjustments: describe bespoke add-backs/exclusions; use "" if none.
-- reportingFrequencyDays: default to 30 if not specified.
-- Extract ALL financial covenants: leverage, interest coverage, liquidity, capex, etc.
-- Do not invent covenants not present in the document.
+EVALUATION RULES:
+- For each covenant, use the metricDefinition formula to compute the metric value from the financial metrics provided.
+- Status determination:
+    - "MAX" thresholdType: BREACH if calculatedValue > threshold; WARNING if (threshold × 0.9) ≤ calculatedValue ≤ threshold; PASS if calculatedValue < (threshold × 0.9).
+    - "MIN" thresholdType: BREACH if calculatedValue < threshold; WARNING if threshold ≤ calculatedValue ≤ (threshold × 1.1); PASS if calculatedValue > (threshold × 1.1).
+- Trend: IMPROVING if the metric is moving away from a breach scenario; DETERIORATING if approaching breach; STABLE otherwise.
+- confidenceScore: 100 if all required metrics are available and the formula is unambiguous; reduce proportionally for missing data or ambiguous formulas.
+- overallStatus: worst status across all covenants (BREACH > WARNING > PASS).
+- overallTrend: worst trend across all covenants (DETERIORATING > STABLE > IMPROVING).
+- overallConfidenceScore: minimum confidence score across all covenants.
+- riskNarrative: one concise paragraph summarising the borrower's overall covenant compliance.
 `.trim();
-var buildClaudeRequest = (document, apiKey) => (sendRequester, config) => {
+function buildEvaluationPrompt(financials, covenantSchemas) {
+  const schemasText = covenantSchemas.map((c, i2) => `${i2 + 1}. ${c.name}
+` + `   Formula: ${c.metricDefinition}
+` + `   Threshold: ${c.threshold} (${c.thresholdType})
+` + `   EBITDA Adjustments: ${c.ebitdaAdjustments || "None"}`).join(`
+`);
+  const metricsText = Object.entries(financials.metrics).map(([k, v]) => `  ${k}: ${v}`).join(`
+`);
+  return `Evaluate the following financial covenants for ${financials.quarter} ${financials.year}.
+
+` + `COVENANT SCHEMAS:
+${schemasText}
+
+` + `BORROWER FINANCIAL METRICS:
+${metricsText}
+
+` + `Evaluate each covenant using the formula and financial metrics above. ` + `Return strictly typed JSON matching the required format.`;
+}
+function callClaude(sendRequester, config, userPrompt, apiKey) {
   const requestBody = JSON.stringify({
     model: config.aiModel,
     max_tokens: 4096,
     temperature: 0,
-    system: COVENANT_EXTRACTION_SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `Extract all financial covenants from the following loan document:
-
-${document}`
-      }
-    ]
+    system: COVENANT_EVALUATION_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: userPrompt }]
   });
   const encodedBody = Buffer.from(new TextEncoder().encode(requestBody)).toString("base64");
   const resp = sendRequester.sendRequest({
@@ -15638,21 +16807,16 @@ ${document}`
   if (!content) {
     throw new Error("Malformed Claude response: missing content[0].text");
   }
-  return JSON.parse(content);
-};
-var buildOpenAIRequest = (document, apiKey) => (sendRequester, config) => {
+  return JSON.parse(stripMarkdownFences(content));
+}
+function callOpenAI(sendRequester, config, userPrompt, apiKey) {
   const requestBody = JSON.stringify({
     model: config.aiModel,
     temperature: 0,
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: COVENANT_EXTRACTION_SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `Extract all financial covenants from the following loan document:
-
-${document}`
-      }
+      { role: "system", content: COVENANT_EVALUATION_SYSTEM_PROMPT },
+      { role: "user", content: userPrompt }
     ]
   });
   const encodedBody = Buffer.from(new TextEncoder().encode(requestBody)).toString("base64");
@@ -15676,115 +16840,158 @@ ${document}`
   if (!content) {
     throw new Error("Malformed OpenAI response: missing choices[0].message.content");
   }
-  return JSON.parse(content);
+  return JSON.parse(stripMarkdownFences(content));
+}
+var buildAIRequest = (quarter, covenantSchemas, apiKey) => (sendRequester, config) => {
+  const financialsResp = sendRequester.sendRequest({
+    method: "GET",
+    url: `${config.financialApiUrl}/api/borrower-financials/${quarter}`,
+    headers: { accept: "application/json" },
+    body: "",
+    cacheSettings: { store: true, maxAge: "300s" }
+  }).result();
+  if (!ok(financialsResp)) {
+    const bodyText = new TextDecoder().decode(financialsResp.body);
+    throw new Error(`Financial API error ${financialsResp.statusCode}: ${bodyText}`);
+  }
+  const financials = JSON.parse(new TextDecoder().decode(financialsResp.body));
+  const userPrompt = buildEvaluationPrompt(financials, covenantSchemas);
+  if (config.aiProvider === "claude") {
+    return callClaude(sendRequester, config, userPrompt, apiKey);
+  }
+  return callOpenAI(sendRequester, config, userPrompt, apiKey);
 };
-var onHttpTrigger = (runtime2, payload) => {
+var onCronTrigger = (runtime2, _payload) => {
   runtime2.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  runtime2.log("Covenant Sentinel — Loan Onboarding Workflow");
+  runtime2.log("Covenant Sentinel — Continuous Monitoring Workflow");
   runtime2.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   try {
-    if (!payload.input || payload.input.length === 0) {
-      throw new Error("Empty request payload — send JSON with document, tokenAddress, principalAmountWei");
-    }
-    const input = decodeJson(payload.input);
-    if (!input.document || input.document.trim().length === 0) {
-      throw new Error('Field "document" is required: provide full loan agreement text');
-    }
-    if (!input.tokenAddress) {
-      throw new Error('Field "tokenAddress" is required: provide the ERC-20 token address');
-    }
-    if (!input.principalAmountWei) {
-      throw new Error('Field "principalAmountWei" is required: provide uint256 scaled by 1e18');
-    }
-    runtime2.log(`[Step 1] Document received: ${input.document.length} chars`);
-    runtime2.log(`[Step 1] Token address: ${input.tokenAddress}`);
-    runtime2.log(`[Step 1] Principal (wei): ${input.principalAmountWei}`);
-    const secretId = runtime2.config.aiProvider === "claude" ? "CLAUDE_API_KEY" : "OPENAI_API_KEY";
-    const secret = runtime2.getSecret({ id: secretId }).result();
-    console.log(`Retrieved secret ${JSON.stringify(secret)}`);
-    const apiKey = secret.value;
-    runtime2.log(`[Step 2] AI provider: ${runtime2.config.aiProvider} / model: ${runtime2.config.aiModel}`);
-    runtime2.log("[Step 3] Extracting covenant schema via AI (running in node mode)...");
-    const httpClient = new ClientCapability2;
-    const requestBuilder = runtime2.config.aiProvider === "claude" ? buildClaudeRequest(input.document, apiKey) : buildOpenAIRequest(input.document, apiKey);
-    const extractedSchema = httpClient.sendRequest(runtime2, requestBuilder, consensusIdenticalAggregation())(runtime2.config).result();
-    runtime2.log(`[Step 3] AI consensus reached — ${extractedSchema.covenantNames.length} covenants extracted`);
-    runtime2.log(`[Step 3] Covenants: ${extractedSchema.covenantNames.join(", ")}`);
-    const n = extractedSchema.covenantNames.length;
-    if (n === 0) {
-      throw new Error("No covenants extracted — check document content and AI prompt");
-    }
-    if (extractedSchema.metricDefinitions.length !== n || extractedSchema.thresholds.length !== n || extractedSchema.thresholdTypes.length !== n || extractedSchema.ebitdaAdjustments.length !== n) {
-      throw new Error("AI returned inconsistent covenant array lengths");
-    }
-    const loanId = keccak256(toBytes(`${input.tokenAddress.toLowerCase()}:${input.document.slice(0, 512)}`));
-    runtime2.log(`[Step 4] Loan ID (bytes32): ${loanId}`);
-    const scaledThresholds = extractedSchema.thresholds.map((t) => BigInt(Math.round(t * 1000000000000000000)));
-    const reportingFrequencySecs = BigInt((extractedSchema.reportingFrequencyDays || 30) * 24 * 60 * 60);
-    const principalWei = BigInt(input.principalAmountWei);
-    runtime2.log("[Step 5] Encoding registerLoan call data...");
-    const callData = encodeFunctionData({
-      abi: LoanRegistryAbi,
-      functionName: "registerLoan",
-      args: [
-        loanId,
-        input.tokenAddress,
-        principalWei,
-        reportingFrequencySecs,
-        extractedSchema.covenantNames,
-        extractedSchema.metricDefinitions,
-        scaledThresholds,
-        extractedSchema.thresholdTypes,
-        extractedSchema.ebitdaAdjustments
-      ]
+    const config = runtime2.config;
+    const referenceDate = config.reportingDate ? new Date(config.reportingDate) : new Date;
+    const month = referenceDate.getUTCMonth() + 1;
+    const quarter = Math.ceil(month / 3);
+    const quarterLabel = `Q${quarter}`;
+    runtime2.log(`[Step 1] Reporting date: ${config.reportingDate || "live (UTC now)"}`);
+    runtime2.log(`[Step 1] Quarter derived: ${quarterLabel} (month ${month})`);
+    runtime2.log("[Step 2] Reading covenant names from LoanRegistry...");
+    runtime2.log(`[Step 2] Loan ID: ${config.loanId}`);
+    runtime2.log(`[Step 2] Chain: ${config.chainSelectorName}`);
+    const network248 = getNetwork({
+      chainFamily: "evm",
+      chainSelectorName: config.chainSelectorName,
+      isTestnet: true
     });
-    runtime2.log("[Step 6] Generating signed consensus report...");
+    if (!network248) {
+      throw new Error(`Unknown chain selector name: ${config.chainSelectorName}`);
+    }
+    const evmClient = new ClientCapability(network248.chainSelector.selector);
+    const namesCallData = encodeFunctionData({
+      abi: LoanRegistryAbi,
+      functionName: "getCovenantNames",
+      args: [config.loanId]
+    });
+    const namesResult = evmClient.callContract(runtime2, {
+      call: {
+        to: hexToBase64(config.loanRegistryAddress),
+        data: hexToBase64(namesCallData)
+      }
+    }).result();
+    const covenantNames = decodeFunctionResult({
+      abi: LoanRegistryAbi,
+      functionName: "getCovenantNames",
+      data: bytesToHex(namesResult.data)
+    });
+    runtime2.log(`[Step 2] Found ${covenantNames.length} covenants: ${covenantNames.join(", ")}`);
+    if (covenantNames.length === 0) {
+      throw new Error("No covenants found for loan — verify loanId and LoanRegistry registration");
+    }
+    runtime2.log("[Step 3] Reading covenant schemas from LoanRegistry...");
+    const covenantSchemas = covenantNames.map((name) => {
+      const covCallData = encodeFunctionData({
+        abi: LoanRegistryAbi,
+        functionName: "getCovenant",
+        args: [config.loanId, name]
+      });
+      const covResult = evmClient.callContract(runtime2, {
+        call: {
+          to: hexToBase64(config.loanRegistryAddress),
+          data: hexToBase64(covCallData)
+        }
+      }).result();
+      const [covName, metricDef, threshold, thresholdType, ebitdaAdj] = decodeFunctionResult({
+        abi: LoanRegistryAbi,
+        functionName: "getCovenant",
+        data: bytesToHex(covResult.data)
+      });
+      return {
+        name: covName,
+        metricDefinition: metricDef,
+        threshold: Number(threshold) / 1000000000000000000,
+        thresholdType,
+        ebitdaAdjustments: ebitdaAdj
+      };
+    });
+    runtime2.log(`[Step 3] Loaded ${covenantSchemas.length} covenant schemas`);
+    for (const s of covenantSchemas) {
+      runtime2.log(`[Step 3]   ${s.name}: ${s.thresholdType} ${s.threshold} | ${s.metricDefinition}`);
+    }
+    runtime2.log("[Step 4] Running AI covenant evaluation (node mode)...");
+    runtime2.log(`[Step 4] Provider: ${config.aiProvider} / Model: ${config.aiModel}`);
+    const secretId = config.aiProvider === "claude" ? "CLAUDE_API_KEY" : "OPENAI_API_KEY";
+    const secret = runtime2.getSecret({ id: secretId }).result();
+    const apiKey = secret.value;
+    const httpClient = new ClientCapability2;
+    const evaluation = httpClient.sendRequest(runtime2, buildAIRequest(quarter.toString(), covenantSchemas, apiKey), consensusIdenticalAggregation())(config).result();
+    runtime2.log(`[Step 4] Consensus reached — overall status: ${evaluation.overallStatus}`);
+    runtime2.log(`[Step 4] Evaluations: ${evaluation.covenantEvaluations.length} covenants`);
+    for (const ce of evaluation.covenantEvaluations) {
+      runtime2.log(`[Step 4]   ${ce.covenantName}: ${ce.status} (value=${ce.calculatedValue}, confidence=${ce.confidenceScore}%)`);
+    }
+    runtime2.log("[Step 5] Publishing health report to LoanHealthFeed...");
+    runtime2.log(`[Step 5] Contract: ${config.loanHealthFeedAddress}`);
+    const callData = encodeAbiParameters(parseAbiParameters("bytes32 loanId, uint8 overallStatus, uint8 overallTrend, uint256 overallConfidenceScore, string riskNarrative, string[] covenantNames, uint8[] statuses, uint256[] calculatedValues, uint256[] thresholds, uint256[] confidenceScores, uint8[] trends, string[] notes"), [
+      config.loanId,
+      BigInt(STATUS_MAP[evaluation.overallStatus]),
+      BigInt(TREND_MAP[evaluation.overallTrend]),
+      BigInt(evaluation.overallConfidenceScore),
+      evaluation.riskNarrative,
+      evaluation.covenantEvaluations.map((c) => c.covenantName),
+      evaluation.covenantEvaluations.map((c) => BigInt(STATUS_MAP[c.status])),
+      evaluation.covenantEvaluations.map((c) => BigInt(Math.round(c.calculatedValue * 1000000000000000000))),
+      covenantSchemas.map((s) => BigInt(Math.round(s.threshold * 1000000000000000000))),
+      evaluation.covenantEvaluations.map((c) => BigInt(c.confidenceScore)),
+      evaluation.covenantEvaluations.map((c) => BigInt(TREND_MAP[c.trend])),
+      evaluation.covenantEvaluations.map((c) => c.notes)
+    ]);
     const reportResponse = runtime2.report({
       encodedPayload: hexToBase64(callData),
       encoderName: "evm",
       signingAlgo: "ecdsa",
       hashingAlgo: "keccak256"
     }).result();
-    runtime2.log("[Step 7] Writing covenant schema to LoanRegistry onchain...");
-    runtime2.log(`[Step 7] Contract: ${runtime2.config.loanRegistryAddress}`);
-    runtime2.log(`[Step 7] Chain: ${runtime2.config.chainSelectorName}`);
-    const network248 = getNetwork({
-      chainFamily: "evm",
-      chainSelectorName: runtime2.config.chainSelectorName,
-      isTestnet: true
-    });
-    if (!network248) {
-      throw new Error(`Unknown chain selector name: ${runtime2.config.chainSelectorName}`);
-    }
-    const evmClient = new ClientCapability(network248.chainSelector.selector);
     const writeResult = evmClient.writeReport(runtime2, {
-      receiver: runtime2.config.loanRegistryAddress,
+      receiver: config.loanHealthFeedAddress,
       report: reportResponse,
-      gasConfig: {
-        gasLimit: runtime2.config.gasLimit
-      }
+      gasConfig: { gasLimit: config.gasLimit }
     }).result();
     if (writeResult.txStatus !== TxStatus.SUCCESS) {
-      throw new Error(`LoanRegistry write failed (${writeResult.txStatus}): ${writeResult.errorMessage ?? "unknown error"}`);
+      throw new Error(`LoanHealthFeed write failed (${writeResult.txStatus}): ${writeResult.errorMessage ?? "unknown error"}`);
     }
     const txHash = bytesToHex(writeResult.txHash || new Uint8Array(32));
-    runtime2.log(`[Step 7] Transaction confirmed: ${txHash}`);
-    const confirmation = JSON.stringify({
-      loanId,
-      tokenAddress: input.tokenAddress,
+    runtime2.log(`[Step 5] Transaction confirmed: ${txHash}`);
+    const summary = JSON.stringify({
+      loanId: config.loanId,
+      quarter: quarterLabel,
       txHash,
-      covenantCount: n,
-      covenants: extractedSchema.covenantNames.map((name, i2) => ({
-        name,
-        metricDefinition: extractedSchema.metricDefinitions[i2],
-        threshold: extractedSchema.thresholds[i2],
-        thresholdType: extractedSchema.thresholdTypes[i2],
-        ebitdaAdjustments: extractedSchema.ebitdaAdjustments[i2] || null
-      }))
+      overallStatus: evaluation.overallStatus,
+      overallTrend: evaluation.overallTrend,
+      overallConfidenceScore: evaluation.overallConfidenceScore,
+      riskNarrative: evaluation.riskNarrative,
+      covenantEvaluations: evaluation.covenantEvaluations
     });
-    runtime2.log("[Step 8] Loan onboarding complete");
+    runtime2.log("[Step 6] Continuous monitoring cycle complete");
     runtime2.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    return confirmation;
+    return summary;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     runtime2.log(`[ERROR] ${msg}`);
@@ -15793,9 +17000,9 @@ var onHttpTrigger = (runtime2, payload) => {
   }
 };
 var initWorkflow = (config) => {
-  const httpTrigger = new HTTPCapability;
+  const cronTrigger = new CronCapability;
   return [
-    handler(httpTrigger.trigger({}), onHttpTrigger)
+    handler(cronTrigger.trigger({ schedule: config.cronExpression }), onCronTrigger)
   ];
 };
 async function main() {
