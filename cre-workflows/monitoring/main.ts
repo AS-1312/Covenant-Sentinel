@@ -480,27 +480,37 @@ const onCronTrigger = (runtime: Runtime<Config>, _payload: CronPayload): string 
 		// where `report` is abi.decode'd as PublishReportInput struct.
 		// Encode as flat named params (struct fields) — no 4-byte selector.
 		const callData = encodeAbiParameters(
-			parseAbiParameters(
-				'bytes32 loanId, uint8 overallStatus, uint8 overallTrend, uint256 overallConfidenceScore, string riskNarrative, string[] covenantNames, uint8[] statuses, uint256[] calculatedValues, uint256[] thresholds, uint256[] confidenceScores, uint8[] trends, string[] notes',
-			),
-			[
-				config.loanId as `0x${string}`,
-				BigInt(STATUS_MAP[evaluation.overallStatus]),
-				BigInt(TREND_MAP[evaluation.overallTrend]),
-				BigInt(evaluation.overallConfidenceScore),
-				evaluation.riskNarrative,
-				evaluation.covenantEvaluations.map((c) => c.covenantName),
-				evaluation.covenantEvaluations.map((c) => BigInt(STATUS_MAP[c.status])),
-				evaluation.covenantEvaluations.map((c) =>
-					BigInt(Math.round(c.calculatedValue * 1e18)),
-				),
-				covenantSchemas.map((s) => BigInt(Math.round(s.threshold * 1e18))),
-				evaluation.covenantEvaluations.map((c) =>
-					BigInt(c.confidenceScore),
-				),
-				evaluation.covenantEvaluations.map((c) => BigInt(TREND_MAP[c.trend])),
-				evaluation.covenantEvaluations.map((c) => c.notes),
-			],
+			[{
+				type: 'tuple',
+				components: [
+					{ name: 'loanId',                  type: 'bytes32'   },
+					{ name: 'overallStatus',            type: 'uint8'     },
+					{ name: 'overallTrend',             type: 'uint8'     },
+					{ name: 'overallConfidenceScore',   type: 'uint256'   },
+					{ name: 'riskNarrative',            type: 'string'    },
+					{ name: 'covenantNames',            type: 'string[]'  },
+					{ name: 'statuses',                 type: 'uint8[]'   },
+					{ name: 'calculatedValues',         type: 'uint256[]' },
+					{ name: 'thresholds',               type: 'uint256[]' },
+					{ name: 'confidenceScores',         type: 'uint256[]' },
+					{ name: 'trends',                   type: 'uint8[]'   },
+					{ name: 'notes',                    type: 'string[]'  },
+				],
+			}],
+			[{
+				loanId:                 config.loanId as `0x${string}`,
+				overallStatus:          STATUS_MAP[evaluation.overallStatus],
+				overallTrend:           TREND_MAP[evaluation.overallTrend],
+				overallConfidenceScore: BigInt(evaluation.overallConfidenceScore),
+				riskNarrative:          evaluation.riskNarrative,
+				covenantNames:          evaluation.covenantEvaluations.map(c => c.covenantName),
+				statuses:               evaluation.covenantEvaluations.map(c => STATUS_MAP[c.status]),
+				calculatedValues:       evaluation.covenantEvaluations.map(c => BigInt(Math.round(c.calculatedValue * 1e18))),
+				thresholds:             covenantSchemas.map(s => BigInt(Math.round(s.threshold * 1e18))),
+				confidenceScores:       evaluation.covenantEvaluations.map(c => BigInt(c.confidenceScore)),
+				trends:                 evaluation.covenantEvaluations.map(c => TREND_MAP[c.trend]),
+				notes:                  evaluation.covenantEvaluations.map(c => c.notes),
+			}],
 		)
 
 		const reportResponse = runtime

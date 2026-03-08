@@ -1,12 +1,12 @@
 {
   "cronExpression": "0 0 * * *",
   "reportingDate": "2026-01-15",
-  "loanId": "0xf166f629588cb5be34d5b00f4ec0bdad30c683609bfb04f41f8aa2e5bd0b5822",
+  "loanId": "0x5072697661746543726564697431000000000000000000000000000000000000",
   "financialApiUrl": "http://localhost:3000",
   "loanRegistryAddress": "0xFDF832e99b716D63068a58C37aBb83006Eb6C902",
   "loanHealthFeedAddress": "0xeC15EC785A6b234584bD7206843ED0F64a47cF2B",
   "chainSelectorName": "ethereum-testnet-sepolia",
-  "gasLimit": "3000000",
+  "gasLimit": "10000000",
   "aiProvider": "claude",
   "aiModel": "claude-haiku-4-5-20251001"
 }
