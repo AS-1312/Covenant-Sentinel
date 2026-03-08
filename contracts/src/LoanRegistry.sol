@@ -309,7 +309,6 @@ contract LoanRegistry is IReceiverTemplate {
 
     /**
      * @notice ERC165 interface support.
-     * @dev Overrides PolicyProtected's supportsInterface to include CRE receiver interface.
      * @param interfaceId The interface identifier to check.
      * @return True if the interface is supported.
      */

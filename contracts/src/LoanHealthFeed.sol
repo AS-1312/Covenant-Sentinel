@@ -1,69 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.20;
 
 import {IReceiverTemplate} from "./interfaces/IReceiverTemplate.sol";
+import {ILoanHealthFeed} from "./interfaces/ILoanHealthFeed.sol";
 
-contract LoanHealthFeed is IReceiverTemplate {
-    struct CovenantReport {
-        string covenantName;            // e.g., "Maximum Leverage Ratio"
-        CovenantStatus status;          // PASS / WARNING / BREACH
-        uint256 calculatedValue;        // Actual metric value (scaled by 1e18)
-        uint256 threshold;              // Threshold at time of check (scaled by 1e18)
-        uint256 confidenceScore;        // Multi-model consensus confidence (0-100)
-        TrendIndicator trend;           // Direction of metric movement
-        string notes;                   // AI-generated observation (optional)
-    }
-
-    struct LoanHealthReport {
-        bytes32 loanId;                         // Reference to LoanRegistry entry
-        uint256 reportTimestamp;                // When this report was published
-        uint256 reportIndex;                    // Sequential report number for this loan
-        CovenantStatus overallStatus;           // Worst status across all covenants
-        CovenantReport[] covenantReports;       // Per-covenant breakdown
-        TrendIndicator overallTrend;            // Composite trend across all covenants
-        uint256 overallConfidenceScore;         // Aggregate multi-model confidence (0-100)
-        string riskNarrative;                   // AI-generated summary of loan health
-        bool isActive;                          // Whether loan is still being monitored
-    }
-
-    struct LoanHealthSummary {
-        bytes32 loanId;
-        CovenantStatus overallStatus;
-        TrendIndicator overallTrend;
-        uint256 overallConfidenceScore;
-        uint256 lastUpdated;
-        uint256 totalReports;
-        uint256 totalBreaches;
-        uint256 totalWarnings;
-    }
-
-    struct PublishReportInput {
-        bytes32 loanId;
-        CovenantStatus overallStatus;
-        TrendIndicator overallTrend;
-        uint256 overallConfidenceScore;
-        string riskNarrative;
-        string[] covenantNames;
-        CovenantStatus[] statuses;
-        uint256[] calculatedValues;
-        uint256[] thresholds;
-        uint256[] confidenceScores;
-        TrendIndicator[] trends;
-        string[] notes;
-    }
-
-    enum CovenantStatus {
-        PASS,       // Metric within acceptable range
-        WARNING,    // Metric deteriorating but not yet breached
-        BREACH      // Metric has crossed the threshold
-    }
-
-    enum TrendIndicator {
-        IMPROVING,
-        STABLE,
-        DETERIORATING
-    }
-
+contract LoanHealthFeed is ILoanHealthFeed, IReceiverTemplate {
     mapping(bytes32 => bool) isMonitored;
     mapping(bytes32 => LoanHealthReport) latestReports;
     mapping(bytes32 => mapping(uint256 => LoanHealthReport)) reportHistory;
@@ -434,7 +375,6 @@ contract LoanHealthFeed is IReceiverTemplate {
 
     /**
      * @notice ERC165 interface support.
-     * @dev Overrides PolicyProtected's supportsInterface to include CRE receiver interface.
      * @param interfaceId The interface identifier to check.
      * @return True if the interface is supported.
      */
